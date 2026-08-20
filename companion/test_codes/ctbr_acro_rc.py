@@ -22,9 +22,14 @@ Control (all done here; ArduPilot only runs the inner rate loop):
     yaw hold P            -> yaw body rate
 
 Setup:
-    Real hardware (drone1, confirmed working - see companion/tools/check_fc_link.py):
+    Real hardware (drone1) over the USB link - the one confirmed bidirectional:
         python3 ctbr_acro_rc.py --alt 1
-        (defaults to --connect /dev/ttyAMA0 --baud 57600)
+        (defaults to --connect /dev/ttyACM0 --baud 115200)
+
+    Over the GPIO UART instead (NOTE: on drone1 this link is currently
+    receive-only - the FC's heartbeats arrive but nothing we send reaches it,
+    so this will hang at wait_heartbeat's first param write):
+        python3 ctbr_acro_rc.py --connect /dev/ttyAMA0 --baud 57600 --alt 1
 
     SITL - connect DIRECTLY, not through MAVProxy, so streams hit 100 Hz:
         python3 ctbr_acro_rc.py --connect tcp:127.0.0.1:5762 --alt 1
@@ -221,12 +226,13 @@ def send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, pwm_map, mon):
 
 def main():
     ap = argparse.ArgumentParser(description="CTBR hover in ACRO via RC override (takeoff included)")
-    ap.add_argument("--connect", default="/dev/ttyAMA0",
-                     help="MAVLink endpoint - serial device path (e.g. /dev/ttyAMA0) or "
-                          "a URL like tcp:127.0.0.1:5762 for SITL")
-    ap.add_argument("--baud", type=int, default=57600,
+    ap.add_argument("--connect", default="/dev/ttyACM0",
+                     help="MAVLink endpoint - serial device path (e.g. /dev/ttyACM0 for the USB "
+                          "link, /dev/ttyAMA0 for the GPIO UART) or a URL like "
+                          "tcp:127.0.0.1:5762 for SITL")
+    ap.add_argument("--baud", type=int, default=115200,
                      help="baud rate for serial --connect targets (ignored for tcp:/udp: URLs); "
-                          "drone1's flight controller on /dev/ttyAMA0 is confirmed at 57600")
+                          "USB /dev/ttyACM0 uses 115200, the GPIO UART /dev/ttyAMA0 uses 57600")
     ap.add_argument("--alt", type=float, default=1.0, help="hover height [m]")
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)

@@ -99,7 +99,21 @@ github.com; prints the public key, which then has to be added manually at
 GitHub API/CLI access available to automate that step). **Leave "Allow
 write access" unchecked.**
 
-To actually pull the latest code onto a Pi (clones on first run):
+Two ways to get code onto a drone. **Use `sync.sh` while developing**; the
+GitHub round-trip is slow and needs the Pi to have working internet through
+the NAT gateway, which is the least reliable part of the setup.
+
+```
+setup/deploy/sync.sh <pi-host> <pi-user>          # rsync working tree over SSH
+setup/deploy/sync.sh <pi-host> <pi-user> -n       # dry run first
+setup/deploy/sync.sh <pi-host> <pi-user> --reset  # discard Pi edits, match origin/main
+```
+Works over FFT alone, includes uncommitted edits, and preserves the Pi's
+`.venv` (which is gitignored and would be painful to rebuild without
+internet). Commit and push only once the code actually works.
+
+To pull the authoritative git-tracked state instead (clones on first run,
+needs internet on the Pi):
 ```
 setup/deploy/deploy.sh <pi-host> <pi-user> [pi-password]
 ```

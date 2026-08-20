@@ -186,13 +186,30 @@ class Chan:
 
 
 # --------------------------------------------------------------- param helpers
-def get_param(m, name, timeout=3.0):
-    m.mav.param_request_read_send(m.target_system, m.target_component, name.encode(), -1)
-    t = time.time()
-    while time.time() - t < timeout:
-        p = m.recv_match(type="PARAM_VALUE", blocking=True, timeout=timeout)
-        if p is not None and p.param_id.strip("\x00") == name:
-            return p.param_value
+def gcs_heartbeat(m):
+    """Announce ourselves as a GCS. ArduPilot answers a link it has seen a
+    heartbeat on far more reliably; without this, param reads over the 57600
+    UART are dropped often enough to matter."""
+    m.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS,
+                         mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)
+
+
+def get_param(m, name, timeout=1.0, tries=8):
+    """Read one parameter, retrying, with a heartbeat between attempts.
+
+    A single-shot request is NOT reliable on the 57600 UART while telemetry is
+    streaming - measured 5 of 16 reads failing. Silently accepting that and
+    falling back to a default is how you fly with the wrong RC calibration, so
+    callers must treat None as fatal (see require() in main).
+    """
+    for _ in range(tries):
+        m.mav.param_request_read_send(m.target_system, m.target_component, name.encode(), -1)
+        t = time.time()
+        while time.time() - t < timeout:
+            p = m.recv_match(type="PARAM_VALUE", blocking=True, timeout=timeout)
+            if p is not None and p.param_id.strip("\x00") == name:
+                return p.param_value
+        gcs_heartbeat(m)
     return None
 
 
@@ -293,13 +310,13 @@ def send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, pwm_map, mon):
 
 def main():
     ap = argparse.ArgumentParser(description="CTBR hover in ACRO via RC override (takeoff included)")
-    ap.add_argument("--connect", default="/dev/ttyACM0",
-                     help="MAVLink endpoint - serial device path (e.g. /dev/ttyACM0 for the USB "
-                          "link, /dev/ttyAMA0 for the GPIO UART) or a URL like "
+    ap.add_argument("--connect", default="/dev/ttyAMA0",
+                     help="MAVLink endpoint - serial device path (default /dev/ttyAMA0, the "
+                          "GPIO UART; /dev/ttyACM0 for the USB link) or a URL like "
                           "tcp:127.0.0.1:5762 for SITL")
-    ap.add_argument("--baud", type=int, default=115200,
+    ap.add_argument("--baud", type=int, default=57600,
                      help="baud rate for serial --connect targets (ignored for tcp:/udp: URLs); "
-                          "USB /dev/ttyACM0 uses 115200, the GPIO UART /dev/ttyAMA0 uses 57600")
+                          "the GPIO UART /dev/ttyAMA0 uses 57600, USB /dev/ttyACM0 uses 115200")
     ap.add_argument("--alt", type=float, default=1.0, help="hover height [m]")
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)
@@ -315,15 +332,35 @@ def main():
     m = mavutil.mavlink_connection(args.connect, baud=args.baud, source_system=255)
     m.wait_heartbeat()
     print(f"[i] Heartbeat sys {m.target_system}")
+    for _ in range(3):            # identify as a GCS before any param traffic
+        gcs_heartbeat(m)
+        time.sleep(0.1)
 
     # ---- VERIFY (never modify) the vehicle config this script's maths assumes ----
     # This script deliberately writes no parameters. The stick->command inversion
     # below is only valid when expo and deadzone are zero and ACRO is pure rate,
     # so those are checked and the run is refused if they don't match - rather
     # than silently reconfiguring the aircraft and leaving it that way.
-    # channel map (which RC channel is roll/pitch/thr/yaw); default 1/2/3/4
-    cmap = {k: int(get_param(m, f"RCMAP_{k}") or d)
-            for k, d in (("ROLL", 1), ("PITCH", 2), ("THROTTLE", 3), ("YAW", 4))}
+    # Every value below is flight-critical: a wrong RC calibration or channel
+    # map silently produces wrong PWM. Missing reads are collected and treated
+    # as fatal rather than defaulted.
+    missing = []
+
+    def require(name):
+        v = get_param(m, name)
+        if v is None:
+            missing.append(name)
+            return 0.0
+        return float(v)
+
+    # channel map (which RC channel is roll/pitch/thr/yaw)
+    cmap = {k: int(require(f"RCMAP_{k}"))
+            for k in ("ROLL", "PITCH", "THROTTLE", "YAW")}
+    if missing:
+        # bail now: without the channel map every later read targets RC0_*
+        print(f"[!] Could not read the RC channel map from the FC: {missing}")
+        print("[!] Refusing to run - the maths would silently use wrong channels.")
+        return
 
     # Expo and deadzone are compensated for in software (see expo_inverse and
     # Chan), so they may be set to anything. ACRO_TRAINER is different: with it
@@ -377,18 +414,16 @@ def main():
     print("[i] Config verified: ACRO trainer/expo and rate-channel deadzones are zero.")
 
     def chan(ch):
-        return Chan(get_param(m, f"RC{ch}_MIN") or 1000,
-                    get_param(m, f"RC{ch}_MAX") or 2000,
-                    get_param(m, f"RC{ch}_TRIM") or 1500,
-                    get_param(m, f"RC{ch}_DZ") or 0,
-                    get_param(m, f"RC{ch}_REVERSED") or 0)
+        return Chan(require(f"RC{ch}_MIN"), require(f"RC{ch}_MAX"),
+                    require(f"RC{ch}_TRIM"), require(f"RC{ch}_DZ"),
+                    require(f"RC{ch}_REVERSED"))
     ch_roll, ch_pitch, ch_thr, ch_yaw = (chan(cmap["ROLL"]), chan(cmap["PITCH"]),
                                          chan(cmap["THROTTLE"]), chan(cmap["YAW"]))
-    acro_rp_rate = float(get_param(m, "ACRO_RP_RATE") or 360.0)   # deg/s at full stick
-    acro_y_rate = float(get_param(m, "ACRO_Y_RATE") or 202.5)
-    acro_rp_expo = float(get_param(m, "ACRO_RP_EXPO") or 0.0)     # compensated, not forced
-    acro_y_expo = float(get_param(m, "ACRO_Y_EXPO") or 0.0)
-    thr_mid = float(get_param(m, "MOT_THST_HOVER") or 0.35)       # hover throttle 0..1
+    acro_rp_rate = require("ACRO_RP_RATE")                        # deg/s at full stick
+    acro_y_rate = require("ACRO_Y_RATE")
+    acro_rp_expo = require("ACRO_RP_EXPO")                        # compensated, not forced
+    acro_y_expo = require("ACRO_Y_EXPO")
+    thr_mid = require("MOT_THST_HOVER")                           # hover throttle 0..1
     # THR_MID no longer exists on Copter 4.x; ArduPilot itself falls back to 500
     # (Mode::get_pilot_desired_throttle), so this fallback matches the firmware.
     mid_stick = float(get_param(m, "THR_MID") or 500.0)           # mid-stick 0..1000
@@ -399,6 +434,20 @@ def main():
           f"thr ch min/dz/trim/max={ch_thr.min}/{ch_thr.dz}/{ch_thr.trim}/{ch_thr.max}")
     print(f"[i] deadzones compensated in software: roll={ch_roll.dz} pitch={ch_pitch.dz} "
           f"yaw={ch_yaw.dz} thr={ch_thr.dz}")
+
+    if missing:
+        print(f"[!] {len(missing)} flight-critical parameter(s) could not be read "
+              f"from the FC after retries:")
+        for name in missing:
+            print(f"      {name}")
+        print("[!] Refusing to run. Falling back to defaults here would mean flying")
+        print("[!] with the wrong RC calibration - e.g. a zero deadzone default")
+        print("[!] makes every small attitude correction map inside the real")
+        print("[!] deadzone and do nothing at all. Check the link and re-run.")
+        return
+    if acro_rp_rate <= 0 or acro_y_rate <= 0:
+        print(f"[!] Implausible rate limits from FC (rp={acro_rp_rate}, y={acro_y_rate}) - aborting.")
+        return
 
     def rate_to_pwm(rate_rads, rate_max_degs, ch, expo):
         # AP computes rate = ACRO_*_RATE * input_expo(norm_in, expo), so undo the

@@ -11,12 +11,57 @@ for the full design/rationale - this file is the quick-reference index.
 
 | Name   | Host               | SSH user | Status |
 |--------|--------------------|----------|--------|
-| drone1 | drone1-pi.local    | drone1   | Active, fully set up (network gateway, SSH key, GitHub deploy key). Flight controller: ArduPilot (quadrotor) on UART, `/dev/ttyAMA0` @ 57600 baud - confirmed via `companion/tools/check_fc_link.py`. |
+| drone1 | drone1-pi.local    | drone1   | Active (network gateway, SSH key, GitHub deploy key). Flight controller: iFlight **BlitzF745**, ArduCopter **4.6.2**, quadrotor. See "Flight controller links" below - **not flight-ready**. |
 | drone2 | drone2-pi.local    | drone2   | Not yet provisioned |
 | drone3 | drone3-pi.local    | drone3   | Not yet provisioned |
 
 All run Ubuntu 24.04 (`cat /etc/os-release` to confirm), NetworkManager +
 netplan, on the `192.168.1.0/24` FFT subnet.
+
+## Flight controller links (drone1) - READ BEFORE FLYING
+
+Two physical links to the BlitzF745, both MAVLink2:
+
+| Link | Device | Baud | State |
+|------|--------|------|-------|
+| GPIO UART (pins 8/10) | `/dev/ttyAMA0` | 57600 | FC->Pi reliable. **Pi->FC INTERMITTENT - unresolved hardware fault.** |
+| USB | `/dev/ttyACM0` | 115200 | Bidirectional, but re-enumerated spontaneously once mid-session |
+
+**The UART fault is the top blocker.** Measured across four runs with no
+changes in between: 0 replies, then success on attempt 1, then 11/16, then
+**0/13 in 141.7s**. FC heartbeats arrive throughout, so `T3` -> Pi pin 10 is
+sound; the fault is confined to **Pi pin 8 -> FC `R3`**. That signature is a
+marginal joint (cold solder / partially seated pin / wire broken inside its
+insulation), which is the worst case for flight: it passes preflight and
+drops out under vibration.
+
+Both sides have been ruled out in software, so don't re-debug them:
+- Pi pinmux verified: `pin 14`/`pin 15` claimed by `1f00030000.serial`, function `uart0`
+- FC `SERIAL3` = MAVLink2 @ 57600, `OPTIONS = 0` (no inversion, no flow control)
+- Board default is `SERIAL3 -> UART3 (GPS)`; this aircraft re-tasks it to
+  MAVLink2 with GPS moved to `SERIAL4`. That is intentional and correct.
+
+To verify a repair: `companion/tools/uart_arm_param_test.py --no-arm` should
+report **13/13 in a few seconds**. Anything less - or 13/13 only sometimes -
+means the joint is still marginal. Flex the harness while it runs.
+
+Note: ArduPilot answers param requests far more reliably on a link it has seen
+a **GCS heartbeat** on (`MAV_TYPE_GCS`). All tools here send one before any
+param traffic; without it, reads fail even on a healthy link.
+
+### Other flight blockers (unresolved)
+
+- **GPS-only position hold at 1 m.** `EK3_SRC1_POSXY/VELXY = 3` (GPS), fix
+  type 3. ~1-2.5 m accuracy that wanders, and `ctbr_acro_rc.py`'s XY loop
+  chases it with 12 deg of tilt authority at 1 m altitude.
+- **Spool-up vs climb ramp.** Motors measured ~1.2 s dead + ~0.5 s ramp to
+  the 1100us `MOT_SPIN_ARM` idle, but `alt_sp` starts ramping at t=0, so the
+  altitude PID integrates against unresponsive motors at liftoff.
+- **`--force-arm` bypasses `ARMING_CHECK = 1`**, including EKF/GPS checks.
+- **LAND fallback is untested** - it can only be exercised in flight.
+- **`FS_GCS_ENABLE = 0`**: the FC does nothing if the companion link dies.
+  After `RC_OVERRIDE_TIME = 3.0 s` control reverts to the transmitter, whose
+  throttle sits at 991 (min) - so a pilot must be holding it at hover.
 
 ## SSH access
 
@@ -61,6 +106,25 @@ setup/deploy/deploy.sh <pi-host> <pi-user> [pi-password]
 Password is optional if SSH key login is already set up (no sudo
 involved in this script). Workflow: edit locally -> commit -> push ->
 run `deploy.sh` against whichever drone(s) need the update.
+
+## Companion tools (all read-only unless noted)
+
+| Tool | Purpose |
+|------|---------|
+| `tools/check_fc_link.py` | Heartbeat/link check, scans common bauds. Safe with props on. |
+| `tools/check_fc_params.py` | Dumps the params `ctbr_acro_rc.py` needs + board version. Safe with props on. |
+| `tools/check_serial_ports.py` | Dumps every `SERIALx_PROTOCOL/BAUD/OPTIONS`. Safe with props on. |
+| `tools/uart_arm_param_test.py` | Params + arm/hold/disarm. `--no-arm` is safe with props on; **arming needs props OFF**. |
+| `tools/arm_disarm_test.py` | Arm, hold `--dwell`, disarm, with motor-PWM evidence. **Props OFF.** |
+| `test_codes/ctbr_acro_rc.py` | The CTBR flight script. **Arms and takes off.** |
+
+`ctbr_acro_rc.py` writes no parameters at all unless `--set-trainer` is
+passed, and treats any unreadable flight-critical parameter as fatal rather
+than falling back to a default - a zero-deadzone default silently maps every
+small attitude correction inside the FC's real deadzone, producing no
+rotation at all. `ACRO_TRAINER` must be 0 (this vehicle has 2); it is the one
+setting that cannot be compensated in software, because ArduPilot derives its
+levelling rate from the attitude target rather than from stick input.
 
 Companion-computer code that runs on the drones lives in `companion/`.
 Dependencies are in `companion/requirements.txt`, installed into a venv

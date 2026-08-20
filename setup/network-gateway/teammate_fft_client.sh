@@ -72,6 +72,7 @@ nmcli connection modify "$CONN" ipv4.dns "8.8.8.8" ipv4.ignore-auto-dns yes
 nmcli connection modify "$CONN" ipv4.routes ''
 nmcli connection modify "$CONN" +ipv4.routes "0.0.0.0/0 $GW $request_metric"
 nmcli device reapply "$FFT_IF"
+sleep 1
 
 echo
 echo "--- resulting default routes ---"

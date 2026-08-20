@@ -167,13 +167,21 @@ sudo iptables -L FORWARD -n -v   # packet counters on the tagged rules should in
 ip route get 8.8.8.8             # should go out your WAN interface, not FFT
 ```
 
-## Reversing / disabling
+## Ending a session / reversing
 
-**Stop one drone from routing through a gateway** (run on that Pi):
+**None of this is required for safety** — everything here fails closed by
+design. Unplug your internet source, or just walk away, and drones/
+teammates pointed at you simply lose internet with no error and no side
+effect; reconnecting resumes everything automatically (verified: pulled a
+gateway's rules mid-session, confirmed the Pi failed closed with clean SSH/
+FFT connectivity but no internet, then restored the gateway and the Pi
+regained internet on its own with zero Pi-side changes). The commands below
+are for actively tidying up (handing off a laptop, not wanting to share
+anymore), not something you must remember to run.
+
+**Stop one drone from routing through a gateway:**
 ```
-sudo nmcli connection modify FFT ipv4.routes ''
-sudo nmcli connection modify FFT ipv4.dns "" ipv4.ignore-auto-dns no
-sudo nmcli device reapply wlan0
+./pi_fft_gateway.sh <pi-host> <pi-user> <pi-password> off
 ```
 Falls back to FFT-only (no internet), as before.
 
@@ -183,23 +191,15 @@ laptop):
 sudo ./teammate_fft_client.sh off
 ```
 
-**Disable a gateway machine's forwarding entirely:**
+**Stop a gateway machine from acting as a gateway:**
 ```
-sudo iptables -t nat -S POSTROUTING | grep drone-ops-fft-gateway
-sudo iptables -S FORWARD | grep drone-ops-fft-gateway
-# for each line printed above, replace the leading -A with -D and run it, e.g.:
-sudo iptables -t nat -D POSTROUTING -o <WAN_IF> -m comment --comment drone-ops-fft-gateway -j MASQUERADE
-sudo netfilter-persistent save
+sudo ./stop_gateway.sh
 ```
-Optionally also set `net.ipv4.ip_forward=0` in `/etc/sysctl.conf` and
-`sudo sysctl -p`, though leaving forwarding on is harmless without the
-NAT/FORWARD rules — nothing will actually route.
+Removes the NAT/FORWARD rules this project added (by comment tag) and
+persists the removal. Leaves `net.ipv4.ip_forward=1` in place — harmless
+with no NAT/FORWARD rules to act on.
 
-**Just unplugging the internet source:** no action needed. The rules are
-interface-name-based; with the WAN interface gone they simply have nothing
-to match. Drones lose internet automatically, the gateway machine's own
-traffic is unaffected, and reconnecting resumes everything with no
-re-running of anything.
+**Just unplugging the internet source:** no action needed, see above.
 
 ## Files
 
@@ -211,3 +211,5 @@ re-running of anything.
 - `teammate_fft_client.sh` — run locally (with `sudo`) on a teammate's own
   laptop: `./teammate_fft_client.sh on <gateway-ip>` /
   `./teammate_fft_client.sh off`
+- `stop_gateway.sh` — run with `sudo` on a gateway machine to stop it
+  acting as one (optional tidy-up, not required for safety)

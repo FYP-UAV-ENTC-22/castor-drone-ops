@@ -11,7 +11,7 @@ for the full design/rationale - this file is the quick-reference index.
 
 | Name   | Host               | SSH user | Status |
 |--------|--------------------|----------|--------|
-| drone1 | drone1-pi.local    | drone1   | Active, fully set up (network gateway, SSH key, GitHub deploy key) |
+| drone1 | drone1-pi.local    | drone1   | Active, fully set up (network gateway, SSH key, GitHub deploy key). Flight controller: ArduPilot (quadrotor) on UART, `/dev/ttyAMA0` @ 57600 baud - confirmed via `companion/tools/check_fc_link.py`. |
 | drone2 | drone2-pi.local    | drone2   | Not yet provisioned |
 | drone3 | drone3-pi.local    | drone3   | Not yet provisioned |
 
@@ -89,3 +89,26 @@ touch it, so re-run the pip install step after `requirements.txt` changes.
 - drone2 and drone3 hardware/OS not yet set up - repeat the drone1
   workflow (network gateway pointing, SSH key, GitHub deploy key) once
   they exist.
+
+## Pi 5 gotcha: header UART (GPIO14/15) is disabled by default
+
+Raspberry Pi 5 exposes multiple UART peripherals via the RP1 chip; the
+"primary" one for the 40-pin header pins 14/15 doesn't appear as a
+`/dev` device until it's explicitly enabled. `ttyAMA10` may already
+exist and look valid (it's a real, separate on-SoC UART, `status: okay`)
+but is NOT connected to the header - don't waste time testing it if the
+flight controller is wired to pins 14/15.
+
+Check with:
+```
+cat /proc/device-tree/axi/pcie@120000/rp1/serial@30000/status   # "disabled" = needs enabling
+```
+Fix (needs a reboot):
+```
+echo "dtoverlay=uart0" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+```
+After reboot, the flight controller should appear at `/dev/ttyAMA0`.
+Verify with `companion/tools/check_fc_link.py --port /dev/ttyAMA0`
+(read-only, safe with propellers attached - no arm/mode/RC-override
+commands sent). Confirmed working on drone1 at 57600 baud.

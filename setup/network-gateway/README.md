@@ -16,6 +16,10 @@ assumed device names or "has a default route"), so:
   that and aborts cleanly — it does not guess or half-configure anything.
 - `pi_fft_gateway.sh` points a drone at *whoever runs it* by default (your
   own FFT IP), or at an explicit gateway IP if you pass one.
+- `teammate_fft_client.sh` does the same thing `pi_fft_gateway.sh` does for
+  a Pi, but for a **teammate's own laptop** - with an extra safety net,
+  since a laptop (unlike a Pi) might already have its own real internet
+  that must never be demoted. See its own section below.
 
 ## Topology
 
@@ -81,6 +85,39 @@ Prereq on the Pi: already joined to FFT with a saved NetworkManager profile
 literally named `FFT` (check with `nmcli connection show` on the Pi if
 unsure).
 
+### 3. Give a teammate's own laptop internet via FFT (optional)
+
+If a teammate has no internet source of their own right now, they can
+borrow whoever's currently running `base_station_setup.sh` - **as a
+fallback only**, never overriding their own real internet if they have one.
+Run this locally (with `sudo`) on your own laptop, not over SSH:
+
+```
+sudo ./teammate_fft_client.sh on <gateway-ip>
+sudo ./teammate_fft_client.sh off      # revert any time
+```
+
+Unlike `pi_fft_gateway.sh`, this doesn't just add a low-metric route and
+trust it - a laptop might already have real internet that must not be
+demoted, and NetworkManager's automatic route metrics don't always match
+what you ask for (observed on this project: requesting metric `150` on one
+machine actually resulted in kernel metric `20150`, because NM added its
+own ~20000 baseline to that connection - the number you pass is a request,
+not a guarantee). So the script:
+1. Requests a route metric based on this machine's *currently observed*
+   best real-internet metric + 50.
+2. Applies it, then **re-reads the actual kernel route table** and checks
+   the fallback route really does have a worse (higher) metric than this
+   machine's own best real default route.
+3. If that check fails for any reason, it **automatically rolls back** -
+   clears the route/DNS it just added - rather than risk leaving a
+   misconfigured route that silently steals traffic from real internet.
+
+Verified on this project's base station laptop (which has its own real
+internet): enabling the fallback left the real connection's route
+unchanged and lowest-metric throughout, confirmed by testing actual
+internet reachability before/after, then cleanly reverted with `off`.
+
 ## What each script changes
 
 ### `base_station_setup.sh` (on the gateway machine)
@@ -103,6 +140,15 @@ On the Pi's `FFT` NetworkManager connection profile:
 - `ipv4.dns=8.8.8.8`, `ipv4.ignore-auto-dns=yes` (FFT provides no DNS)
 - `ipv4.routes` cleared, then set to `0.0.0.0/0 <gateway-ip> 100` (metric
   100 beats the dead-end DHCP default's higher metric)
+
+### `teammate_fft_client.sh` (on a teammate's own laptop, local)
+On that laptop's `FFT` NetworkManager connection profile:
+- `ipv4.dns=8.8.8.8`, `ipv4.ignore-auto-dns=yes` (scoped to the FFT
+  connection only - does not touch DNS on your other connections)
+- `ipv4.routes` cleared, then set to `0.0.0.0/0 <gateway-ip> <metric>`,
+  where `<metric>` is picked and *verified* to lose to your own real
+  internet (see "Give a teammate's own laptop internet via FFT" above) -
+  auto-rolled-back if verification fails
 
 ## Verifying
 
@@ -131,6 +177,12 @@ sudo nmcli device reapply wlan0
 ```
 Falls back to FFT-only (no internet), as before.
 
+**Stop a teammate's laptop from using the FFT fallback** (run on that
+laptop):
+```
+sudo ./teammate_fft_client.sh off
+```
+
 **Disable a gateway machine's forwarding entirely:**
 ```
 sudo iptables -t nat -S POSTROUTING | grep drone-ops-fft-gateway
@@ -156,3 +208,6 @@ re-running of anything.
   has internet
 - `pi_fft_gateway.sh` — run from that laptop against a drone Pi:
   `./pi_fft_gateway.sh <pi-host> <ssh-user> <ssh-password> [gateway-ip]`
+- `teammate_fft_client.sh` — run locally (with `sudo`) on a teammate's own
+  laptop: `./teammate_fft_client.sh on <gateway-ip>` /
+  `./teammate_fft_client.sh off`

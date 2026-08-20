@@ -21,8 +21,16 @@ Control (all done here; ArduPilot only runs the inner rate loop):
     x/y position PID -> tilt ref -> attitude P -> roll/pitch body rate
     yaw hold P            -> yaw body rate
 
-Setup: connect DIRECTLY to SITL (not through MAVProxy) so streams hit 100 Hz:
-    python3 ctbr_acro_rc.py --connect tcp:127.0.0.1:5762 --alt 1
+Setup:
+    Real hardware (drone1, confirmed working - see companion/tools/check_fc_link.py):
+        python3 ctbr_acro_rc.py --alt 1
+        (defaults to --connect /dev/ttyAMA0 --baud 57600)
+
+    SITL - connect DIRECTLY, not through MAVProxy, so streams hit 100 Hz:
+        python3 ctbr_acro_rc.py --connect tcp:127.0.0.1:5762 --alt 1
+
+CAUTION: this script arms the vehicle and commands takeoff (see --force-arm).
+Bench-test with propellers OFF before ever running this against real hardware.
 """
 
 import argparse
@@ -213,15 +221,20 @@ def send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, pwm_map, mon):
 
 def main():
     ap = argparse.ArgumentParser(description="CTBR hover in ACRO via RC override (takeoff included)")
-    ap.add_argument("--connect", default="tcp:127.0.0.1:5762")
+    ap.add_argument("--connect", default="/dev/ttyAMA0",
+                     help="MAVLink endpoint - serial device path (e.g. /dev/ttyAMA0) or "
+                          "a URL like tcp:127.0.0.1:5762 for SITL")
+    ap.add_argument("--baud", type=int, default=57600,
+                     help="baud rate for serial --connect targets (ignored for tcp:/udp: URLs); "
+                          "drone1's flight controller on /dev/ttyAMA0 is confirmed at 57600")
     ap.add_argument("--alt", type=float, default=1.0, help="hover height [m]")
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)
     ap.add_argument("--force-arm", action="store_true")
     args = ap.parse_args()
 
-    print(f"[i] Connecting to {args.connect} ...")
-    m = mavutil.mavlink_connection(args.connect, source_system=255)
+    print(f"[i] Connecting to {args.connect} (baud={args.baud} if serial) ...")
+    m = mavutil.mavlink_connection(args.connect, baud=args.baud, source_system=255)
     m.wait_heartbeat()
     print(f"[i] Heartbeat sys {m.target_system}")
 

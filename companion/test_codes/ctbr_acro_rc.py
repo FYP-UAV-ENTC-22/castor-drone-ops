@@ -21,8 +21,10 @@ and deadzone are configured is compensated for in software instead:
 
 The one thing that CANNOT be handled in software is ACRO_TRAINER: when enabled,
 ArduPilot adds its own earth-frame levelling rate computed from the attitude
-target, not from stick input, so no RC value can cancel it. The script verifies
-ACRO_TRAINER == 0 and refuses to run otherwise rather than changing it for you.
+target, not from stick input, so no RC value can cancel it. By default the
+script only verifies ACRO_TRAINER == 0 and refuses to run otherwise. Pass
+--set-trainer to have it temporarily write 0 and restore your original value on
+exit; that is the only parameter write in this script.
 
 Control (all done here; ArduPilot only runs the inner rate loop):
     altitude PID          -> collective thrust
@@ -47,6 +49,7 @@ Bench-test with propellers OFF before ever running this against real hardware.
 """
 
 import argparse
+import atexit
 import math
 import time
 from collections import defaultdict
@@ -193,8 +196,16 @@ def get_param(m, name, timeout=3.0):
     return None
 
 
-# NOTE: there is deliberately no set_param() helper here. This script only ever
-# reads parameters; it must never leave the aircraft reconfigured after a run.
+def set_param(m, name, value, ptype=mavutil.mavlink.MAV_PARAM_TYPE_REAL32):
+    """Write one parameter.
+
+    Deliberately used for ACRO_TRAINER and nothing else, only under
+    --set-trainer, and always paired with an atexit restore. Everything else
+    this script needs is compensated for in software instead - do not add
+    further callers.
+    """
+    m.mav.param_set_send(m.target_system, m.target_component, name.encode(), float(value), ptype)
+    time.sleep(0.05)
 
 
 def set_msg_interval(m, msg_id, hz):
@@ -293,6 +304,11 @@ def main():
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)
     ap.add_argument("--force-arm", action="store_true")
+    ap.add_argument("--set-trainer", action="store_true",
+                    help="temporarily write ACRO_TRAINER=0 and restore the original value "
+                         "on exit. The ONLY parameter this script will ever write, and it "
+                         "cannot survive a power cut or SIGKILL - if the restore is missed, "
+                         "the script says so and you must set it back manually.")
     args = ap.parse_args()
 
     print(f"[i] Connecting to {args.connect} (baud={args.baud} if serial) ...")
@@ -314,6 +330,34 @@ def main():
     # enabled ArduPilot ADDS its own earth-frame levelling rate, derived from the
     # attitude target rather than from stick input (ArduCopter/mode_acro.cpp),
     # so no choice of RC input can cancel it. It has to be off on the vehicle.
+    # --set-trainer: the single permitted parameter write. Registered with atexit
+    # BEFORE the write, so an early return, an exception or Ctrl-C all still
+    # restore it. A power cut or SIGKILL cannot be covered - hence the warning.
+    if args.set_trainer:
+        trainer_original = get_param(m, "ACRO_TRAINER")
+        if trainer_original is None:
+            print("[!] Could not read ACRO_TRAINER - refusing to overwrite it blindly.")
+            return
+        if abs(trainer_original) > 1e-6:
+            def restore_trainer(value=trainer_original):
+                for _ in range(5):
+                    set_param(m, "ACRO_TRAINER", value)
+                    back = get_param(m, "ACRO_TRAINER")
+                    if back is not None and abs(back - value) < 1e-6:
+                        print(f"[i] ACRO_TRAINER restored to {value:g}.")
+                        return
+                print(f"[!] FAILED to restore ACRO_TRAINER. Set it back to {value:g} "
+                      f"manually in Mission Planner before flying with a transmitter.")
+            atexit.register(restore_trainer)
+
+            set_param(m, "ACRO_TRAINER", 0)
+            confirmed = get_param(m, "ACRO_TRAINER")
+            if confirmed is None or abs(confirmed) > 1e-6:
+                print("[!] ACRO_TRAINER write was not confirmed by the FC - aborting.")
+                return
+            print(f"[i] ACRO_TRAINER temporarily set to 0 (was {trainer_original:g}); "
+                  "it will be restored on exit.")
+
     required = [("ACRO_TRAINER", 0.0)]
 
     problems = []

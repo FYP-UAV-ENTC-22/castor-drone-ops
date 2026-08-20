@@ -62,8 +62,17 @@ Password is optional if SSH key login is already set up (no sudo
 involved in this script). Workflow: edit locally -> commit -> push ->
 run `deploy.sh` against whichever drone(s) need the update.
 
-Companion-computer code that runs on the drones lives in `companion/` -
-currently an empty placeholder, not yet built out.
+Companion-computer code that runs on the drones lives in `companion/`.
+Dependencies are in `companion/requirements.txt`, installed into a venv
+(system-wide pip is blocked by PEP 668 on these Pis' Ubuntu 24.04):
+```
+cd ~/drone-ops/companion
+python3 -m venv .venv          # first time only
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python test_codes/ctbr_acro_rc.py --connect <mavlink-endpoint>
+```
+`.venv/` is gitignored - each Pi builds its own, `deploy.sh` doesn't
+touch it, so re-run the pip install step after `requirements.txt` changes.
 
 ## Known TODOs / flagged issues
 

@@ -138,9 +138,8 @@ def get_param(m, name, timeout=3.0):
     return None
 
 
-def set_param(m, name, value, ptype=mavutil.mavlink.MAV_PARAM_TYPE_REAL32):
-    m.mav.param_set_send(m.target_system, m.target_component, name.encode(), float(value), ptype)
-    time.sleep(0.05)
+# NOTE: there is deliberately no set_param() helper here. This script only ever
+# reads parameters; it must never leave the aircraft reconfigured after a run.
 
 
 def set_msg_interval(m, msg_id, hz):
@@ -244,15 +243,37 @@ def main():
     m.wait_heartbeat()
     print(f"[i] Heartbeat sys {m.target_system}")
 
-    # ---- force clean ACRO behaviour, then read the calibration we invert ----
-    set_param(m, "ACRO_TRAINER", 0)        # pure rate, no auto-level
-    set_param(m, "ACRO_RP_EXPO", 0)        # linear rate mapping
-    set_param(m, "ACRO_Y_EXPO", 0)
+    # ---- VERIFY (never modify) the vehicle config this script's maths assumes ----
+    # This script deliberately writes no parameters. The stick->command inversion
+    # below is only valid when expo and deadzone are zero and ACRO is pure rate,
+    # so those are checked and the run is refused if they don't match - rather
+    # than silently reconfiguring the aircraft and leaving it that way.
     # channel map (which RC channel is roll/pitch/thr/yaw); default 1/2/3/4
     cmap = {k: int(get_param(m, f"RCMAP_{k}") or d)
             for k, d in (("ROLL", 1), ("PITCH", 2), ("THROTTLE", 3), ("YAW", 4))}
-    for k in ("ROLL", "PITCH", "YAW"):
-        set_param(m, f"RC{cmap[k]}_DZ", 0)   # kill deadzone on rate channels
+
+    required = [("ACRO_TRAINER", 0.0),     # pure rate, no auto-level
+                ("ACRO_RP_EXPO", 0.0),     # linear rate mapping
+                ("ACRO_Y_EXPO", 0.0)]
+    required += [(f"RC{cmap[k]}_DZ", 0.0)  # no deadzone on the rate channels
+                 for k in ("ROLL", "PITCH", "YAW")]
+
+    problems = []
+    for pname, want in required:
+        got = get_param(m, pname)
+        if got is None:
+            problems.append(f"      {pname}: no reply from FC (could not verify)")
+        elif abs(got - want) > 1e-6:
+            problems.append(f"      {pname} = {got:g}, must be {want:g}")
+    if problems:
+        print("[!] Vehicle config does not match what this script's maths assumes:")
+        for p in problems:
+            print(p)
+        print("[!] This script does not write parameters. Set these on the FC "
+              "yourself (Mission Planner / QGroundControl), then re-run.")
+        return
+    print("[i] Config verified: ACRO trainer/expo and rate-channel deadzones are zero.")
+
     def chan(ch):
         return Chan(get_param(m, f"RC{ch}_MIN") or 1000,
                     get_param(m, f"RC{ch}_MAX") or 2000,
@@ -384,9 +405,21 @@ def main():
         print("\n[i] Interrupted.")
     finally:
         print("[i] Landing (LAND mode) ...")
-        # release override so LAND controls freely
-        m.mav.rc_channels_override_send(m.target_system, 1, *([0] * 8))
-        set_mode_confirm(m, st, mon, "LAND")
+        # Confirm LAND *before* releasing the override. Releasing first hands
+        # throttle back to the RC receiver while still in ACRO - if the mode
+        # change is then dropped, that is zero throttle in mid-air.
+        landed_mode = False
+        for attempt in range(3):
+            if set_mode_confirm(m, st, mon, "LAND", timeout=3.0):
+                landed_mode = True
+                break
+            print(f"[!] LAND not confirmed (attempt {attempt + 1}/3), retrying ...")
+        if landed_mode:
+            # safe now: LAND is active and controls the throttle itself
+            m.mav.rc_channels_override_send(m.target_system, 1, *([0] * 8))
+        else:
+            print("[!] LAND NOT CONFIRMED - not releasing the override, so throttle "
+                  "is not actively handed back mid-air. TAKE MANUAL CONTROL NOW.")
         t_l = time.time()
         while time.time() - t_l < 20.0 and st.armed:
             drain(m, st, mon); time.sleep(0.1)

@@ -10,11 +10,19 @@ channels over MAVLink therefore gives a genuine CTBR interface that can lift off
     ch(pitch) -> pitch body rate        ch(yaw)      -> yaw   body rate
 
 RC override sends PWM (1000..2000), so we invert ArduCopter's own stick->command maths
-using parameters READ FROM THE VEHICLE:
-    rate:      rate_degs = ACRO_RP_RATE * norm_input      (ACRO_*_EXPO forced to 0)
-               norm_input -> PWM via RCx_MIN/MAX/TRIM      (RCx_DZ forced to 0)
-    throttle:  cubic expo around THR_MID / MOT_THST_HOVER  (inverted numerically)
-    ACRO_TRAINER forced to 0 so ACRO is pure rate (no auto-leveling to fight us).
+using parameters READ FROM THE VEHICLE. Nothing is written to the FC - whatever expo
+and deadzone are configured is compensated for in software instead:
+    rate:      rate_degs = ACRO_*_RATE * input_expo(norm_input, ACRO_*_EXPO)
+               inverted via expo_inverse(), then norm_input -> PWM through
+               RC_Channel::norm_input_dz() inverted with RCx_MIN/MAX/TRIM/DZ/REVERSED
+    throttle:  cubic expo around MOT_THST_HOVER (inverted numerically), then
+               0..1000 -> PWM through RC_Channel::pwm_to_range_dz() inverted,
+               which measures from (RC3_MIN + RC3_DZ)
+
+The one thing that CANNOT be handled in software is ACRO_TRAINER: when enabled,
+ArduPilot adds its own earth-frame levelling rate computed from the attitude
+target, not from stick input, so no RC value can cancel it. The script verifies
+ACRO_TRAINER == 0 and refuses to run otherwise rather than changing it for you.
 
 Control (all done here; ArduPilot only runs the inner rate loop):
     altitude PID          -> collective thrust
@@ -112,19 +120,66 @@ class State:
         return -self.vz
 
 
+def expo_inverse(n_out, expo):
+    """Inverse of ArduPilot's input_expo() (AP_Math/control.cpp, Copter-4.6):
+
+        out = (1 - expo) * in / (1 - expo * |in|)      when expo < 0.95
+        out = in                                       otherwise
+
+    Solving the first case for `in` gives:
+
+        in = out / (1 - expo + expo * |out|)
+
+    so we can ask for a rate and get the stick position that produces it,
+    whatever ACRO_*_EXPO happens to be set to on the vehicle.
+    """
+    n_out = clamp(n_out, -1.0, 1.0)
+    if expo >= 0.95:                      # matches AP's own branch
+        return n_out
+    den = 1.0 - expo + expo * abs(n_out)
+    if den <= 1e-6:                       # unreachable for expo < 0.95, guard anyway
+        return n_out
+    return clamp(n_out / den, -1.0, 1.0)
+
+
 class Chan:
-    """One RC channel's calibration, used to invert norm_input -> PWM."""
-    def __init__(self, mn, mx, tr):
+    """One RC channel's calibration, used to invert ArduPilot's PWM -> input maths.
+
+    Mirrors RC_Channel::norm_input_dz() (angle channels: roll/pitch/yaw) and
+    RC_Channel::pwm_to_range_dz() (range channels: throttle), including the
+    channel's deadzone and reverse flag, so no RCx_DZ has to be zeroed on the FC.
+    """
+    def __init__(self, mn, mx, tr, dz=0, rev=0):
         self.min, self.max, self.trim = int(mn), int(mx), int(tr)
+        self.dz = int(dz)
+        self.rev = bool(rev)
 
     def pwm_from_norm(self, n):
-        """norm_input in [-1,1] (deadzone forced to 0) -> PWM."""
+        """Inverse of norm_input_dz(): norm_input in [-1,1] -> PWM."""
         n = clamp(n, -1.0, 1.0)
-        if n >= 0:
-            pwm = self.trim + n * (self.max - self.trim)
+        if self.rev:
+            n = -n                        # undo reverse_mul
+        dz_min, dz_max = self.trim - self.dz, self.trim + self.dz
+        if n > 0:
+            pwm = dz_max + n * (self.max - dz_max)
+        elif n < 0:
+            pwm = dz_min + n * (dz_min - self.min)
         else:
-            pwm = self.trim + n * (self.trim - self.min)
+            pwm = self.trim               # anywhere in the deadzone reads as 0
         return int(clamp(pwm, self.min, self.max))
+
+    def pwm_from_range(self, control_in, high_in=1000.0):
+        """Inverse of pwm_to_range_dz(): control_in in 0..high_in -> PWM.
+
+        Forward is  control_in = high_in * (r - (min + dz)) / (max - (min + dz)),
+        with r mirrored about the range first when the channel is reversed.
+        """
+        c = clamp(control_in, 0.0, high_in)
+        low = self.min + self.dz
+        r = low + c * (self.max - low) / high_in
+        if self.rev:
+            r = self.max + self.min - r   # undo the mirroring AP applies first
+        return int(clamp(r, self.min, self.max))
 
 
 # --------------------------------------------------------------- param helpers
@@ -185,8 +240,10 @@ def thrust_to_pwm(thrust, thr_mid, mid_stick, ch3):
         else:
             hi = mid
     tc = 0.5 * (lo + hi)
-    pwm = ch3.min + (tc / 1000.0) * (ch3.max - ch3.min)
-    return int(clamp(pwm, ch3.min, ch3.max))
+    # throttle is a RANGE channel: control_in comes from pwm_to_range_dz(), which
+    # measures from (min + RC3_DZ), not from min. Ignoring that biases the whole
+    # thrust feedforward low.
+    return ch3.pwm_from_range(tc)
 
 
 # --------------------------------------------------------------------- drain
@@ -252,11 +309,12 @@ def main():
     cmap = {k: int(get_param(m, f"RCMAP_{k}") or d)
             for k, d in (("ROLL", 1), ("PITCH", 2), ("THROTTLE", 3), ("YAW", 4))}
 
-    required = [("ACRO_TRAINER", 0.0),     # pure rate, no auto-level
-                ("ACRO_RP_EXPO", 0.0),     # linear rate mapping
-                ("ACRO_Y_EXPO", 0.0)]
-    required += [(f"RC{cmap[k]}_DZ", 0.0)  # no deadzone on the rate channels
-                 for k in ("ROLL", "PITCH", "YAW")]
+    # Expo and deadzone are compensated for in software (see expo_inverse and
+    # Chan), so they may be set to anything. ACRO_TRAINER is different: with it
+    # enabled ArduPilot ADDS its own earth-frame levelling rate, derived from the
+    # attitude target rather than from stick input (ArduCopter/mode_acro.cpp),
+    # so no choice of RC input can cancel it. It has to be off on the vehicle.
+    required = [("ACRO_TRAINER", 0.0)]
 
     problems = []
     for pname, want in required:
@@ -277,27 +335,38 @@ def main():
     def chan(ch):
         return Chan(get_param(m, f"RC{ch}_MIN") or 1000,
                     get_param(m, f"RC{ch}_MAX") or 2000,
-                    get_param(m, f"RC{ch}_TRIM") or 1500)
+                    get_param(m, f"RC{ch}_TRIM") or 1500,
+                    get_param(m, f"RC{ch}_DZ") or 0,
+                    get_param(m, f"RC{ch}_REVERSED") or 0)
     ch_roll, ch_pitch, ch_thr, ch_yaw = (chan(cmap["ROLL"]), chan(cmap["PITCH"]),
                                          chan(cmap["THROTTLE"]), chan(cmap["YAW"]))
     acro_rp_rate = float(get_param(m, "ACRO_RP_RATE") or 360.0)   # deg/s at full stick
     acro_y_rate = float(get_param(m, "ACRO_Y_RATE") or 202.5)
+    acro_rp_expo = float(get_param(m, "ACRO_RP_EXPO") or 0.0)     # compensated, not forced
+    acro_y_expo = float(get_param(m, "ACRO_Y_EXPO") or 0.0)
     thr_mid = float(get_param(m, "MOT_THST_HOVER") or 0.35)       # hover throttle 0..1
+    # THR_MID no longer exists on Copter 4.x; ArduPilot itself falls back to 500
+    # (Mode::get_pilot_desired_throttle), so this fallback matches the firmware.
     mid_stick = float(get_param(m, "THR_MID") or 500.0)           # mid-stick 0..1000
     print(f"[i] ACRO_RP_RATE={acro_rp_rate:.0f} deg/s  ACRO_Y_RATE={acro_y_rate:.0f}  "
           f"MOT_THST_HOVER={thr_mid:.2f}  THR_MID={mid_stick:.0f}")
+    print(f"[i] expo compensated in software: rp={acro_rp_expo:.2f} y={acro_y_expo:.2f}")
     print(f"[i] RCMAP r/p/t/y={cmap['ROLL']}/{cmap['PITCH']}/{cmap['THROTTLE']}/{cmap['YAW']}  "
-          f"thr ch min/trim/max={ch_thr.min}/{ch_thr.trim}/{ch_thr.max}")
+          f"thr ch min/dz/trim/max={ch_thr.min}/{ch_thr.dz}/{ch_thr.trim}/{ch_thr.max}")
+    print(f"[i] deadzones compensated in software: roll={ch_roll.dz} pitch={ch_pitch.dz} "
+          f"yaw={ch_yaw.dz} thr={ch_thr.dz}")
 
-    def rate_to_pwm(rate_rads, rate_max_degs, ch):
+    def rate_to_pwm(rate_rads, rate_max_degs, ch, expo):
+        # AP computes rate = ACRO_*_RATE * input_expo(norm_in, expo), so undo the
+        # expo to find the norm_in that yields the rate we actually want.
         n = clamp(math.degrees(rate_rads) / rate_max_degs, -1.0, 1.0)
-        return ch.pwm_from_norm(n)
+        return ch.pwm_from_norm(expo_inverse(n, expo))
 
     def build_pwm(roll_rate, pitch_rate, yaw_rate, thrust):
         return {
-            cmap["ROLL"]:     rate_to_pwm(roll_rate, acro_rp_rate, ch_roll),
-            cmap["PITCH"]:    rate_to_pwm(pitch_rate, acro_rp_rate, ch_pitch),
-            cmap["YAW"]:      rate_to_pwm(yaw_rate, acro_y_rate, ch_yaw),
+            cmap["ROLL"]:     rate_to_pwm(roll_rate, acro_rp_rate, ch_roll, acro_rp_expo),
+            cmap["PITCH"]:    rate_to_pwm(pitch_rate, acro_rp_rate, ch_pitch, acro_rp_expo),
+            cmap["YAW"]:      rate_to_pwm(yaw_rate, acro_y_rate, ch_yaw, acro_y_expo),
             cmap["THROTTLE"]: thrust_to_pwm(thrust, thr_mid, mid_stick, ch_thr),
         }
 

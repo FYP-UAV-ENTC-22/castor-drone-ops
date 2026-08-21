@@ -366,6 +366,11 @@ def main():
                      help="baud rate for serial --connect targets (ignored for tcp:/udp: URLs); "
                           "the GPIO UART /dev/ttyAMA0 uses 57600, USB /dev/ttyACM0 uses 115200")
     ap.add_argument("--alt", type=float, default=1.0, help="hover height [m]")
+    ap.add_argument("--climb-rate", type=float, default=0.3,
+                    help="altitude setpoint ramp rate [m/s] - lower means a gentler, "
+                         "less aggressive takeoff (the PID's own response scales with "
+                         "how fast the target moves; there is no separate accel limit "
+                         "to tune - see the note above RAMP_RATE for why not)")
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)
     ap.add_argument("--force-arm", action="store_true")
@@ -561,7 +566,7 @@ def main():
               f"start_pos=({st.x:.2f},{st.y:.2f})")
 
     # ---- controllers ----
-    # Altitude setpoint ramps at this rate (m/s) from ground_alt up to --alt,
+    # Altitude setpoint ramps at --climb-rate (m/s) from ground_alt up to --alt,
     # then holds. There is deliberately no separate "ramp for N seconds, then
     # snap to the target" branch: for --alt 1 the old code's fixed 2s ramp
     # happened to reach exactly 1m at climb_t=2 and the snap was invisible,
@@ -572,7 +577,17 @@ def main():
     # briefly read 180 deg, altitude overshot to 9.7m against a 3m target,
     # position drifted ~7m before the loops recovered). This form ramps to
     # any --alt at a constant rate with no discontinuity, ever.
-    RAMP_RATE = 0.5
+    #
+    # Takeoff gentleness is tuned HERE, not with a limit on the PID's thrust
+    # output. A thrust-output slew limiter was tried and simulated first: it
+    # makes things WORSE, because alt_pid's integrator keeps accumulating
+    # error the (rate-limited) actuator isn't allowed to act on, and once the
+    # limiter releases, the wound-up integrator overshoots harder than with
+    # no limiter at all (simulated: slew<=0.4/s roughly tripled peak
+    # acceleration and pushed the 3m-target overshoot to 4.34m). Slowing the
+    # RAMP RATE instead has no such risk - the PID never sees an actuator
+    # limit it doesn't know about, it just tracks a slower-moving target.
+    RAMP_RATE = args.climb_rate
     THRUST_MAX = 0.95
     # floor for the 1/cos(tilt) collective boost: past 45 deg the aircraft is no
     # longer hovering and the divisor must not be allowed to run away.

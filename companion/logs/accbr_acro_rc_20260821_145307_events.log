@@ -1,0 +1,556 @@
+   0.000s  log opened
+   0.000s  args: {'connect': '/dev/ttyAMA0', 'baud': 57600, 'alt': 3.0, 'climb_rate': 0.3, 'pos_filter_tc': 0.3, 'freq': 100.0, 'hold': 25.0, 'force_arm': True, 'set_trainer': True, 'accept_default_hover': False, 'log_dir': None}
+   0.309s  Heartbeat sys 1
+   1.402s  ACRO_TRAINER temporarily 0 (was 2).
+  13.221s  Thrust mapping inputs: MOT_THST_HOVER=0.3130 (the entire accel scale)
+  13.393s      MOT_THST_EXPO    = 0.59       motor curve ArduPilot inverts
+  13.481s      MOT_HOVER_LEARN  = 2          2 = learn and save on disarm
+  13.580s      MOT_SPIN_ARM     = 0.1        idle, below which thrust is not proportional
+  13.686s      MOT_SPIN_MIN     = 0.1        
+  13.767s      MOT_BAT_VOLT_MAX = 16.8       0 = voltage compensation DISABLED
+  13.892s      MOT_BAT_VOLT_MIN = 13.2       
+  13.972s      ACRO_OPTIONS     = 0          bit0 = pure rate loop; 0 = attitude loop on top
+  14.096s      ACRO_RP_RATE_TC  = 0          0 = no lag on the rate command
+  14.299s      ACRO_Y_RATE_TC   = 0          
+  14.299s  ACRO_RP_RATE=360 deg/s  ACRO_Y_RATE=202  expo rp=0.30 y=0.00 (compensated in software)
+  14.299s  RCMAP r/p/t/y=1/2/3/4  thr min/dz/trim/max=988/30/988/2011
+  14.299s  Thrust map: T_n = 0.3130 * a_total / 9.807   (1 g -> T_n=0.313, no vehicle mass involved)
+  14.304s  State ok. alt=-0.03 yaw=+151.7 deg start_pos=(2.88,0.10) pos_filter_tc=0.30s
+  14.466s  [ACK] cmd=511 MAV_RESULT_ACCEPTED
+  14.466s  [ACK] cmd=176 MAV_RESULT_ACCEPTED
+  14.466s  Mode confirmed: ACRO
+  14.772s  Arming (ACRO, throttle min, force=True) ...
+  14.875s  [ACK] cmd=400 MAV_RESULT_ACCEPTED
+  15.212s  armed state changed: False -> True
+  15.222s  Armed. Taking off with ACCBR (throttle-up) ...
+  15.232s  [!] state went stale: att_age=20ms pos_age=31ms (>30ms threshold) at alt=+0.02 dxy=0.01
+  15.273s  state fresh again: att_age=-0ms pos_age=-0ms
+  15.312s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.02 dxy=0.02
+  15.353s  state fresh again: att_age=-1ms pos_age=-1ms
+  15.392s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.02 dxy=0.02
+  15.433s  state fresh again: att_age=-1ms pos_age=-1ms
+  15.492s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.02 dxy=0.02
+  15.523s  state fresh again: att_age=-0ms pos_age=-0ms
+  15.562s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.02 dxy=0.02
+  15.593s  state fresh again: att_age=-1ms pos_age=-1ms
+  15.632s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.03 dxy=0.02
+  15.643s  state fresh again: att_age=-0ms pos_age=-0ms
+  15.722s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.03 dxy=0.02
+  15.763s  state fresh again: att_age=-1ms pos_age=-1ms
+  15.892s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.04 dxy=0.02
+  15.913s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.032s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.04 dxy=0.03
+  16.083s  state fresh again: att_age=-1ms pos_age=-1ms
+  16.122s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.04 dxy=0.03
+  16.163s  state fresh again: att_age=-1ms pos_age=-1ms
+  16.202s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.04 dxy=0.03
+  16.233s  state fresh again: att_age=-1ms pos_age=-1ms
+  16.272s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.05 dxy=0.03
+  16.293s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.372s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.05 dxy=0.03
+  16.393s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.432s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.05 dxy=0.03
+  16.443s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.512s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.06 dxy=0.03
+  16.543s  state fresh again: att_age=-0ms pos_age=-1ms
+  16.582s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+0.06 dxy=0.03
+  16.613s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.672s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.06 dxy=0.04
+  16.693s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.772s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.07 dxy=0.04
+  16.793s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.832s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.07 dxy=0.04
+  16.863s  state fresh again: att_age=-0ms pos_age=-0ms
+  16.912s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.07 dxy=0.04
+  16.943s  state fresh again: att_age=-0ms pos_age=-1ms
+  16.982s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+0.08 dxy=0.04
+  17.013s  state fresh again: att_age=-0ms pos_age=-0ms
+  17.232s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.08 dxy=0.04
+  17.273s  state fresh again: att_age=-1ms pos_age=-1ms
+  17.312s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.09 dxy=0.05
+  17.353s  state fresh again: att_age=-1ms pos_age=-1ms
+  17.392s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.09 dxy=0.05
+  17.423s  state fresh again: att_age=-0ms pos_age=-1ms
+  17.462s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+0.09 dxy=0.05
+  17.483s  state fresh again: att_age=-0ms pos_age=-0ms
+  17.542s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.10 dxy=0.05
+  17.563s  state fresh again: att_age=-0ms pos_age=-0ms
+  17.622s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.10 dxy=0.05
+  17.673s  state fresh again: att_age=-1ms pos_age=-1ms
+  17.782s  [!] state went stale: att_age=20ms pos_age=40ms (>30ms threshold) at alt=+0.13 dxy=0.07
+  17.803s  state fresh again: att_age=-0ms pos_age=-0ms
+  17.902s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.19 dxy=0.10
+  17.913s  state fresh again: att_age=-0ms pos_age=-0ms
+  18.032s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.32 dxy=0.16
+  18.073s  state fresh again: att_age=-1ms pos_age=-1ms
+  18.112s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.41 dxy=0.20
+  18.123s  state fresh again: att_age=-0ms pos_age=-0ms
+  18.202s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.51 dxy=0.23
+  18.233s  state fresh again: att_age=-1ms pos_age=-1ms
+  18.272s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.60 dxy=0.24
+  18.313s  state fresh again: att_age=-1ms pos_age=-1ms
+  18.352s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+0.67 dxy=0.25
+  18.383s  state fresh again: att_age=-0ms pos_age=-0ms
+  18.442s  [!] state went stale: att_age=40ms pos_age=30ms (>30ms threshold) at alt=+0.78 dxy=0.26
+  18.463s  state fresh again: att_age=-0ms pos_age=-0ms
+  18.542s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.86 dxy=0.26
+  18.553s  state fresh again: att_age=-0ms pos_age=-0ms
+  18.592s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+0.91 dxy=0.26
+  18.633s  state fresh again: att_age=-1ms pos_age=-1ms
+  18.832s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+1.09 dxy=0.29
+  18.873s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.012s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.20 dxy=0.31
+  19.033s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.072s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.24 dxy=0.32
+  19.083s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.162s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+1.29 dxy=0.32
+  19.203s  state fresh again: att_age=-1ms pos_age=-0ms
+  19.322s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.39 dxy=0.34
+  19.373s  state fresh again: att_age=-1ms pos_age=-1ms
+  19.412s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+1.44 dxy=0.35
+  19.453s  state fresh again: att_age=-1ms pos_age=-1ms
+  19.492s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+1.49 dxy=0.37
+  19.503s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.582s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.54 dxy=0.39
+  19.603s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.662s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+1.60 dxy=0.42
+  19.703s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.742s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.64 dxy=0.43
+  19.783s  state fresh again: att_age=-1ms pos_age=-1ms
+  19.822s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+1.69 dxy=0.45
+  19.853s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.902s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.73 dxy=0.47
+  19.923s  state fresh again: att_age=-0ms pos_age=-0ms
+  19.972s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.77 dxy=0.48
+  20.003s  state fresh again: att_age=-0ms pos_age=-0ms
+  20.062s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.80 dxy=0.48
+  20.083s  state fresh again: att_age=-0ms pos_age=-0ms
+  20.142s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.84 dxy=0.49
+  20.183s  state fresh again: att_age=-1ms pos_age=-1ms
+  20.222s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+1.88 dxy=0.50
+  20.253s  state fresh again: att_age=-1ms pos_age=-1ms
+  20.332s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.93 dxy=0.52
+  20.353s  state fresh again: att_age=-0ms pos_age=-0ms
+  20.392s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+1.96 dxy=0.53
+  20.443s  state fresh again: att_age=-1ms pos_age=-1ms
+  20.482s  [!] state went stale: att_age=30ms pos_age=39ms (>30ms threshold) at alt=+1.98 dxy=0.54
+  20.523s  state fresh again: att_age=-1ms pos_age=-1ms
+  20.642s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.01 dxy=0.55
+  20.683s  state fresh again: att_age=-1ms pos_age=-1ms
+  20.722s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.02 dxy=0.55
+  20.753s  state fresh again: att_age=-0ms pos_age=-0ms
+  20.832s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.02 dxy=0.56
+  20.853s  state fresh again: att_age=-0ms pos_age=-0ms
+  20.892s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.03 dxy=0.56
+  20.933s  state fresh again: att_age=-1ms pos_age=-0ms
+  20.992s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.04 dxy=0.56
+  21.013s  state fresh again: att_age=-0ms pos_age=-0ms
+  21.052s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.04 dxy=0.57
+  21.093s  state fresh again: att_age=-1ms pos_age=-1ms
+  21.132s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.05 dxy=0.57
+  21.163s  state fresh again: att_age=-0ms pos_age=-0ms
+  21.212s  [!] state went stale: att_age=40ms pos_age=30ms (>30ms threshold) at alt=+2.07 dxy=0.57
+  21.253s  state fresh again: att_age=-1ms pos_age=-1ms
+  21.292s  [!] state went stale: att_age=39ms pos_age=30ms (>30ms threshold) at alt=+2.08 dxy=0.57
+  21.323s  state fresh again: att_age=-0ms pos_age=-0ms
+  21.382s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.10 dxy=0.58
+  21.423s  state fresh again: att_age=-1ms pos_age=-0ms
+  21.462s  [!] state went stale: att_age=39ms pos_age=40ms (>30ms threshold) at alt=+2.12 dxy=0.57
+  21.493s  state fresh again: att_age=-0ms pos_age=-1ms
+  21.552s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.14 dxy=0.57
+  21.573s  state fresh again: att_age=-0ms pos_age=-1ms
+  21.622s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.16 dxy=0.57
+  21.643s  state fresh again: att_age=-0ms pos_age=-0ms
+  21.692s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.17 dxy=0.57
+  21.743s  state fresh again: att_age=-1ms pos_age=-1ms
+  21.782s  [!] state went stale: att_age=30ms pos_age=39ms (>30ms threshold) at alt=+2.19 dxy=0.57
+  21.823s  state fresh again: att_age=-1ms pos_age=-0ms
+  21.862s  [!] state went stale: att_age=39ms pos_age=40ms (>30ms threshold) at alt=+2.21 dxy=0.57
+  21.903s  state fresh again: att_age=-1ms pos_age=-1ms
+  21.942s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.25 dxy=0.57
+  21.973s  state fresh again: att_age=-0ms pos_age=-0ms
+  22.022s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.28 dxy=0.57
+  22.053s  state fresh again: att_age=-0ms pos_age=-1ms
+  22.092s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.31 dxy=0.58
+  22.123s  state fresh again: att_age=-0ms pos_age=-0ms
+  22.182s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.35 dxy=0.58
+  22.213s  state fresh again: att_age=-0ms pos_age=-1ms
+  22.252s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.38 dxy=0.58
+  22.273s  state fresh again: att_age=-0ms pos_age=-0ms
+  22.412s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.43 dxy=0.57
+  22.463s  state fresh again: att_age=-1ms pos_age=-1ms
+  22.522s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.46 dxy=0.56
+  22.543s  state fresh again: att_age=-0ms pos_age=-0ms
+  22.582s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.46 dxy=0.55
+  22.613s  state fresh again: att_age=-0ms pos_age=-0ms
+  22.672s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.47 dxy=0.55
+  22.713s  state fresh again: att_age=-1ms pos_age=-1ms
+  22.752s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.46 dxy=0.54
+  22.793s  state fresh again: att_age=-1ms pos_age=-1ms
+  22.912s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.46 dxy=0.54
+  22.933s  state fresh again: att_age=-0ms pos_age=-0ms
+  22.992s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.46 dxy=0.53
+  23.043s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.082s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.47 dxy=0.53
+  23.123s  [AP] EKF3 IMU0 MAG0 in-flight yaw alignment complete
+  23.123s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.162s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.48 dxy=0.52
+  23.203s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.322s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.50 dxy=0.51
+  23.353s  state fresh again: att_age=-0ms pos_age=-0ms
+  23.412s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.52 dxy=0.50
+  23.443s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.512s  [!] state went stale: att_age=40ms pos_age=30ms (>30ms threshold) at alt=+2.55 dxy=0.48
+  23.533s  state fresh again: att_age=-0ms pos_age=-0ms
+  23.572s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.56 dxy=0.48
+  23.613s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.652s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.57 dxy=0.47
+  23.693s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.812s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.60 dxy=0.46
+  23.853s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.892s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.61 dxy=0.45
+  23.943s  state fresh again: att_age=-1ms pos_age=-1ms
+  23.982s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.63 dxy=0.45
+  24.003s  state fresh again: att_age=-0ms pos_age=-0ms
+  24.052s  [!] state went stale: att_age=20ms pos_age=40ms (>30ms threshold) at alt=+2.64 dxy=0.44
+  24.083s  state fresh again: att_age=-0ms pos_age=-0ms
+  24.202s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.65 dxy=0.42
+  24.243s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.352s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.67 dxy=0.40
+  24.393s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.432s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.69 dxy=0.39
+  24.473s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.532s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.71 dxy=0.37
+  24.553s  state fresh again: att_age=-0ms pos_age=-0ms
+  24.592s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.72 dxy=0.36
+  24.643s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.682s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.75 dxy=0.35
+  24.723s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.762s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.78 dxy=0.34
+  24.813s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.852s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.80 dxy=0.33
+  24.893s  state fresh again: att_age=-1ms pos_age=-1ms
+  24.932s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.83 dxy=0.32
+  24.953s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.022s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.31
+  25.053s  state fresh again: att_age=-1ms pos_age=-1ms
+  25.092s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.86 dxy=0.29
+  25.103s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.342s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.92 dxy=0.25
+  25.353s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.462s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.94 dxy=0.24
+  25.473s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.532s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.96 dxy=0.23
+  25.543s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.592s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.98 dxy=0.22
+  25.613s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.672s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.00 dxy=0.21
+  25.703s  state fresh again: att_age=-0ms pos_age=-1ms
+  25.742s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+3.02 dxy=0.21
+  25.763s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.832s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.04 dxy=0.20
+  25.853s  state fresh again: att_age=-0ms pos_age=-0ms
+  25.912s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.06 dxy=0.21
+  25.953s  state fresh again: att_age=-1ms pos_age=-1ms
+  25.992s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.09 dxy=0.21
+  26.003s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.072s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.11 dxy=0.21
+  26.103s  state fresh again: att_age=-0ms pos_age=-1ms
+  26.142s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+3.13 dxy=0.22
+  26.173s  state fresh again: att_age=-1ms pos_age=-0ms
+  26.232s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.14 dxy=0.22
+  26.243s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.322s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.16 dxy=0.23
+  26.353s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.402s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.17 dxy=0.23
+  26.433s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.522s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.19 dxy=0.23
+  26.533s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.572s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.19 dxy=0.23
+  26.603s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.652s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.20 dxy=0.23
+  26.673s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.892s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.24 dxy=0.24
+  26.913s  state fresh again: att_age=-0ms pos_age=-0ms
+  26.992s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.24 dxy=0.24
+  27.013s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.052s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.25 dxy=0.24
+  27.083s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.132s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.25 dxy=0.24
+  27.173s  state fresh again: att_age=-0ms pos_age=-1ms
+  27.212s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+3.24 dxy=0.24
+  27.253s  state fresh again: att_age=-1ms pos_age=-1ms
+  27.312s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+3.23 dxy=0.25
+  27.333s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.452s  [!] state went stale: att_age=20ms pos_age=40ms (>30ms threshold) at alt=+3.21 dxy=0.25
+  27.493s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.552s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.20 dxy=0.26
+  27.573s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.632s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.19 dxy=0.26
+  27.663s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.722s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.18 dxy=0.27
+  27.743s  state fresh again: att_age=-0ms pos_age=-0ms
+  27.782s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.18 dxy=0.28
+  27.833s  state fresh again: att_age=-1ms pos_age=-1ms
+  27.952s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.16 dxy=0.29
+  27.983s  state fresh again: att_age=-0ms pos_age=-0ms
+  28.122s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.15 dxy=0.29
+  28.163s  state fresh again: att_age=-1ms pos_age=-1ms
+  28.202s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.15 dxy=0.29
+  28.233s  state fresh again: att_age=-0ms pos_age=-1ms
+  28.452s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.13 dxy=0.28
+  28.493s  state fresh again: att_age=-1ms pos_age=-1ms
+  28.532s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.13 dxy=0.27
+  28.583s  state fresh again: att_age=-1ms pos_age=-1ms
+  28.622s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.12 dxy=0.26
+  28.653s  state fresh again: att_age=-1ms pos_age=-1ms
+  28.702s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+3.11 dxy=0.26
+  28.743s  state fresh again: att_age=-0ms pos_age=-0ms
+  28.782s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.11 dxy=0.25
+  28.823s  state fresh again: att_age=-1ms pos_age=-1ms
+  28.882s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.10 dxy=0.24
+  28.903s  state fresh again: att_age=-0ms pos_age=-0ms
+  28.942s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.10 dxy=0.23
+  28.973s  state fresh again: att_age=-0ms pos_age=-0ms
+  29.032s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+3.09 dxy=0.23
+  29.073s  state fresh again: att_age=-1ms pos_age=-0ms
+  29.112s  [!] state went stale: att_age=39ms pos_age=40ms (>30ms threshold) at alt=+3.09 dxy=0.23
+  29.153s  state fresh again: att_age=-1ms pos_age=-1ms
+  29.192s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.09 dxy=0.22
+  29.233s  state fresh again: att_age=-1ms pos_age=-1ms
+  29.272s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.09 dxy=0.22
+  29.313s  state fresh again: att_age=-0ms pos_age=-1ms
+  29.432s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.08 dxy=0.21
+  29.453s  state fresh again: att_age=-0ms pos_age=-0ms
+  29.512s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.08 dxy=0.20
+  29.563s  state fresh again: att_age=-1ms pos_age=-1ms
+  29.602s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.08 dxy=0.19
+  29.643s  state fresh again: att_age=-1ms pos_age=-1ms
+  29.702s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.07 dxy=0.18
+  29.713s  state fresh again: att_age=-0ms pos_age=-0ms
+  29.752s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.06 dxy=0.17
+  29.803s  state fresh again: att_age=-1ms pos_age=-1ms
+  29.842s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.06 dxy=0.16
+  29.883s  state fresh again: att_age=-1ms pos_age=-1ms
+  29.922s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.04 dxy=0.15
+  29.953s  state fresh again: att_age=-0ms pos_age=-0ms
+  30.002s  [!] state went stale: att_age=40ms pos_age=30ms (>30ms threshold) at alt=+3.03 dxy=0.15
+  30.053s  state fresh again: att_age=-1ms pos_age=-1ms
+  30.092s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.02 dxy=0.15
+  30.133s  state fresh again: att_age=-1ms pos_age=-1ms
+  30.202s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.00 dxy=0.14
+  30.213s  state fresh again: att_age=-0ms pos_age=-0ms
+  30.292s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.99 dxy=0.14
+  30.303s  state fresh again: att_age=-0ms pos_age=-0ms
+  30.422s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.97 dxy=0.14
+  30.453s  state fresh again: att_age=-0ms pos_age=-0ms
+  30.502s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.96 dxy=0.14
+  30.553s  state fresh again: att_age=-1ms pos_age=-1ms
+  30.592s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.95 dxy=0.14
+  30.623s  state fresh again: att_age=-0ms pos_age=-1ms
+  30.742s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.94 dxy=0.14
+  30.753s  state fresh again: att_age=-0ms pos_age=-0ms
+  30.822s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.93 dxy=0.14
+  30.863s  state fresh again: att_age=-1ms pos_age=-1ms
+  30.922s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.93 dxy=0.14
+  30.953s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.012s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.93 dxy=0.15
+  31.033s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.072s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.92 dxy=0.15
+  31.123s  state fresh again: att_age=-1ms pos_age=-1ms
+  31.162s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.92 dxy=0.16
+  31.193s  state fresh again: att_age=-1ms pos_age=-1ms
+  31.232s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.91 dxy=0.16
+  31.283s  state fresh again: att_age=-1ms pos_age=-1ms
+  31.322s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.91 dxy=0.16
+  31.353s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.402s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.90 dxy=0.17
+  31.433s  state fresh again: att_age=-1ms pos_age=-0ms
+  31.492s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.89 dxy=0.17
+  31.513s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.592s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.88 dxy=0.18
+  31.613s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.732s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.86 dxy=0.19
+  31.763s  state fresh again: att_age=-0ms pos_age=-1ms
+  31.802s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.86 dxy=0.20
+  31.833s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.922s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.21
+  31.933s  state fresh again: att_age=-0ms pos_age=-0ms
+  31.972s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.22
+  32.013s  state fresh again: att_age=-1ms pos_age=-1ms
+  32.052s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.84 dxy=0.23
+  32.083s  state fresh again: att_age=-0ms pos_age=-0ms
+  32.132s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.83 dxy=0.24
+  32.173s  state fresh again: att_age=-0ms pos_age=-1ms
+  32.212s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.82 dxy=0.25
+  32.243s  state fresh again: att_age=-1ms pos_age=-1ms
+  32.362s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.82 dxy=0.26
+  32.393s  state fresh again: att_age=-0ms pos_age=-0ms
+  32.452s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.82 dxy=0.27
+  32.493s  state fresh again: att_age=-1ms pos_age=-1ms
+  32.552s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.83 dxy=0.27
+  32.573s  state fresh again: att_age=-0ms pos_age=-0ms
+  32.612s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.83 dxy=0.28
+  32.643s  state fresh again: att_age=-0ms pos_age=-0ms
+  32.692s  [!] state went stale: att_age=20ms pos_age=40ms (>30ms threshold) at alt=+2.83 dxy=0.28
+  32.743s  state fresh again: att_age=-0ms pos_age=-1ms
+  32.782s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.84 dxy=0.29
+  32.803s  state fresh again: att_age=-0ms pos_age=-0ms
+  32.882s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.29
+  32.913s  state fresh again: att_age=-0ms pos_age=-0ms
+  32.982s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.30
+  32.993s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.112s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.30
+  33.143s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.272s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.30
+  33.293s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.432s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.30
+  33.473s  state fresh again: att_age=-1ms pos_age=-1ms
+  33.512s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.84 dxy=0.29
+  33.543s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.622s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.29
+  33.643s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.702s  [!] state went stale: att_age=40ms pos_age=20ms (>30ms threshold) at alt=+2.84 dxy=0.29
+  33.733s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.772s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.84 dxy=0.29
+  33.813s  state fresh again: att_age=-1ms pos_age=-0ms
+  33.852s  [!] state went stale: att_age=39ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.29
+  33.863s  state fresh again: att_age=-0ms pos_age=-0ms
+  33.932s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.29
+  33.963s  state fresh again: att_age=-0ms pos_age=-0ms
+  34.002s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.29
+  34.043s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.082s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.86 dxy=0.29
+  34.133s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.172s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.86 dxy=0.28
+  34.203s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.262s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.87 dxy=0.28
+  34.283s  state fresh again: att_age=-0ms pos_age=-0ms
+  34.352s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.87 dxy=0.27
+  34.363s  state fresh again: att_age=-0ms pos_age=-0ms
+  34.402s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.87 dxy=0.27
+  34.423s  state fresh again: att_age=-0ms pos_age=-0ms
+  34.482s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.87 dxy=0.27
+  34.523s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.562s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.86 dxy=0.26
+  34.613s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.652s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.86 dxy=0.25
+  34.693s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.732s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.85 dxy=0.25
+  34.743s  state fresh again: att_age=-0ms pos_age=-0ms
+  34.812s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.24
+  34.853s  state fresh again: att_age=-1ms pos_age=-1ms
+  34.912s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.85 dxy=0.23
+  34.933s  state fresh again: att_age=-0ms pos_age=-0ms
+  34.972s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.86 dxy=0.23
+  35.013s  state fresh again: att_age=-1ms pos_age=-1ms
+  35.052s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.87 dxy=0.22
+  35.063s  state fresh again: att_age=-0ms pos_age=-0ms
+  35.252s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.90 dxy=0.21
+  35.273s  state fresh again: att_age=-0ms pos_age=-0ms
+  35.342s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.92 dxy=0.21
+  35.363s  state fresh again: att_age=-0ms pos_age=-0ms
+  35.402s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.94 dxy=0.20
+  35.443s  state fresh again: att_age=-1ms pos_age=-1ms
+  35.482s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.96 dxy=0.20
+  35.533s  state fresh again: att_age=-1ms pos_age=-1ms
+  35.572s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.97 dxy=0.19
+  35.603s  state fresh again: att_age=-0ms pos_age=-0ms
+  35.732s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.99 dxy=0.19
+  35.783s  state fresh again: att_age=-1ms pos_age=-1ms
+  35.822s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.00 dxy=0.18
+  35.843s  state fresh again: att_age=-1ms pos_age=-1ms
+  35.902s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.00 dxy=0.17
+  35.913s  state fresh again: att_age=-0ms pos_age=-0ms
+  36.052s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.98 dxy=0.15
+  36.063s  state fresh again: att_age=-0ms pos_age=-0ms
+  36.132s  [!] state went stale: att_age=40ms pos_age=30ms (>30ms threshold) at alt=+2.97 dxy=0.14
+  36.173s  state fresh again: att_age=-1ms pos_age=-1ms
+  36.212s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.96 dxy=0.12
+  36.233s  state fresh again: att_age=-0ms pos_age=-0ms
+  36.292s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.96 dxy=0.11
+  36.333s  state fresh again: att_age=-1ms pos_age=-1ms
+  36.622s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.96 dxy=0.06
+  36.653s  state fresh again: att_age=-0ms pos_age=-1ms
+  36.692s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.97 dxy=0.06
+  36.733s  state fresh again: att_age=-1ms pos_age=-1ms
+  36.772s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.98 dxy=0.07
+  36.783s  state fresh again: att_age=-0ms pos_age=-0ms
+  36.892s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.00 dxy=0.08
+  36.903s  state fresh again: att_age=-0ms pos_age=-0ms
+  36.942s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.01 dxy=0.09
+  36.973s  state fresh again: att_age=-0ms pos_age=-0ms
+  37.022s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.02 dxy=0.10
+  37.033s  state fresh again: att_age=-0ms pos_age=-0ms
+  37.102s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.04 dxy=0.11
+  37.113s  state fresh again: att_age=-0ms pos_age=-0ms
+  37.182s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.05 dxy=0.12
+  37.223s  state fresh again: att_age=-1ms pos_age=-1ms
+  37.262s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.07 dxy=0.13
+  37.273s  state fresh again: att_age=-0ms pos_age=-0ms
+  37.592s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.14 dxy=0.18
+  37.623s  state fresh again: att_age=-0ms pos_age=-1ms
+  37.662s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+3.14 dxy=0.19
+  37.713s  state fresh again: att_age=-1ms pos_age=-1ms
+  37.752s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.14 dxy=0.20
+  37.763s  state fresh again: att_age=-0ms pos_age=-0ms
+  37.912s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.13 dxy=0.21
+  37.953s  state fresh again: att_age=-1ms pos_age=-1ms
+  37.992s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.11 dxy=0.22
+  38.023s  state fresh again: att_age=-0ms pos_age=-1ms
+  38.062s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+3.09 dxy=0.22
+  38.113s  state fresh again: att_age=-1ms pos_age=-1ms
+  38.152s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.07 dxy=0.23
+  38.163s  state fresh again: att_age=-0ms pos_age=-0ms
+  38.222s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.04 dxy=0.24
+  38.243s  state fresh again: att_age=-0ms pos_age=-0ms
+  38.302s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.02 dxy=0.24
+  38.343s  state fresh again: att_age=-1ms pos_age=-1ms
+  38.382s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.00 dxy=0.25
+  38.413s  state fresh again: att_age=-0ms pos_age=-0ms
+  38.462s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.99 dxy=0.25
+  38.493s  state fresh again: att_age=-0ms pos_age=-1ms
+  38.532s  [!] state went stale: att_age=40ms pos_age=39ms (>30ms threshold) at alt=+2.98 dxy=0.26
+  38.543s  state fresh again: att_age=-0ms pos_age=-0ms
+  38.622s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.97 dxy=0.27
+  38.643s  state fresh again: att_age=-0ms pos_age=-0ms
+  38.702s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.97 dxy=0.28
+  38.743s  state fresh again: att_age=-1ms pos_age=-1ms
+  38.782s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+2.97 dxy=0.29
+  38.813s  state fresh again: att_age=-0ms pos_age=-0ms
+  38.862s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.98 dxy=0.31
+  38.893s  state fresh again: att_age=-0ms pos_age=-1ms
+  39.022s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+2.99 dxy=0.32
+  39.043s  state fresh again: att_age=-0ms pos_age=-0ms
+  39.102s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.00 dxy=0.33
+  39.153s  state fresh again: att_age=-1ms pos_age=-1ms
+  39.192s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.01 dxy=0.34
+  39.223s  state fresh again: att_age=-1ms pos_age=-1ms
+  39.342s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.02 dxy=0.35
+  39.373s  state fresh again: att_age=-0ms pos_age=-0ms
+  39.432s  [!] state went stale: att_age=40ms pos_age=30ms (>30ms threshold) at alt=+3.03 dxy=0.36
+  39.453s  state fresh again: att_age=-0ms pos_age=-0ms
+  39.512s  [!] state went stale: att_age=30ms pos_age=40ms (>30ms threshold) at alt=+3.03 dxy=0.37
+  39.543s  state fresh again: att_age=-0ms pos_age=-0ms
+  39.582s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.04 dxy=0.38
+  39.633s  state fresh again: att_age=-1ms pos_age=-1ms
+  39.672s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.05 dxy=0.39
+  39.713s  state fresh again: att_age=-1ms pos_age=-1ms
+  39.752s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.06 dxy=0.41
+  39.803s  state fresh again: att_age=-1ms pos_age=-1ms
+  39.922s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.09 dxy=0.43
+  39.963s  state fresh again: att_age=-1ms pos_age=-1ms
+  40.002s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.10 dxy=0.44
+  40.043s  state fresh again: att_age=-1ms pos_age=-1ms
+  40.082s  [!] state went stale: att_age=39ms pos_age=39ms (>30ms threshold) at alt=+3.11 dxy=0.45
+  40.113s  state fresh again: att_age=-0ms pos_age=-1ms
+  40.182s  [!] state went stale: att_age=40ms pos_age=40ms (>30ms threshold) at alt=+3.12 dxy=0.46
+  40.203s  state fresh again: att_age=-0ms pos_age=-0ms
+  40.222s  Landing (LAND mode) ...
+  40.344s  [ACK] cmd=176 MAV_RESULT_ACCEPTED
+  40.344s  Mode confirmed: LAND
+  47.701s  [AP] Field Elevation Set: 0m
+  48.205s  armed state changed: True -> False
+  48.305s  Done.
+  48.434s  ACRO_TRAINER restored to 2.
+  48.434s  log closed (normal exit)

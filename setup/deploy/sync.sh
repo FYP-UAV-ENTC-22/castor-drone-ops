@@ -30,7 +30,10 @@ PI_USER="${2:?usage: $0 <pi-host> <pi-user> [-n|--reset]}"
 MODE="${3:-}"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-DEST="\$HOME/drone-ops/"
+# Relative to the remote user's home. Do NOT use "$HOME" or "~" here: rsync
+# does not expand either after "host:", so it would create a literal
+# "$HOME" directory under the remote home instead.
+DEST="drone-ops/"
 
 if [ "$MODE" = "--reset" ]; then
     echo "Resetting $PI_HOST to origin/main (discards Pi-side edits, keeps .venv) ..."

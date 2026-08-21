@@ -24,18 +24,17 @@ Two physical links to the BlitzF745, both MAVLink2:
 
 | Link | Device | Baud | State |
 |------|--------|------|-------|
-| GPIO UART (pins 8/10) | `/dev/ttyAMA0` | 57600 | FC->Pi reliable. **Pi->FC INTERMITTENT - unresolved hardware fault.** |
+| GPIO UART (pins 8/10) | `/dev/ttyAMA0` | 57600 | **Working** - 33/33 params in 3.2s (2026-08-21, after rewiring) |
 | USB | `/dev/ttyACM0` | 115200 | Bidirectional, but re-enumerated spontaneously once mid-session |
 
-**The UART fault is the top blocker.** Measured across four runs with no
-changes in between: 0 replies, then success on attempt 1, then 11/16, then
-**0/13 in 141.7s**. FC heartbeats arrive throughout, so `T3` -> Pi pin 10 is
-sound; the fault is confined to **Pi pin 8 -> FC `R3`**. That signature is a
-marginal joint (cold solder / partially seated pin / wire broken inside its
-insulation), which is the worst case for flight: it passes preflight and
-drops out under vibration.
+**UART history - resolved.** The Pi->FC direction was intermittent: across
+four runs with nothing changed, 0 replies, then success on attempt 1, then
+11/16, then 0/13 in 141.7s. FC->Pi worked throughout, isolating the fault to
+**Pi pin 8 -> FC `R3`**. Rewiring fixed it; it now reads 33/33 in 3.2s.
+If flakiness ever returns, suspect that joint first - the symptom is
+parameter reads timing out while heartbeats keep arriving.
 
-Both sides have been ruled out in software, so don't re-debug them:
+Both sides were ruled out in software, so don't re-debug them:
 - Pi pinmux verified: `pin 14`/`pin 15` claimed by `1f00030000.serial`, function `uart0`
 - FC `SERIAL3` = MAVLink2 @ 57600, `OPTIONS = 0` (no inversion, no flow control)
 - Board default is `SERIAL3 -> UART3 (GPS)`; this aircraft re-tasks it to
@@ -48,6 +47,23 @@ means the joint is still marginal. Flex the harness while it runs.
 Note: ArduPilot answers param requests far more reliably on a link it has seen
 a **GCS heartbeat** on (`MAV_TYPE_GCS`). All tools here send one before any
 param traffic; without it, reads fail even on a healthy link.
+
+### drone1 RC calibration (read 2026-08-21 over the repaired UART)
+
+```
+RCMAP  roll=1 pitch=2 throttle=3 yaw=4        ACRO_RP_RATE 360   ACRO_Y_RATE 202.5
+RC1 roll     988/1500/2011  DZ 20  REVERSED 0  ACRO_RP_EXPO 0.30  ACRO_Y_EXPO 0
+RC2 pitch    988/1500/2011  DZ 20  REVERSED 1  <-- REVERSED
+RC3 throttle 988/ 988/2011  DZ 30  REVERSED 0  MOT_THST_HOVER 0.3127 (learned)
+RC4 yaw      988/1500/2011  DZ 20  REVERSED 0  MOT_SPIN_ARM 0.10
+```
+
+**`RC2_REVERSED = 1`.** The pitch channel is reversed, so `Chan` must apply
+it - and does. Verified by round-tripping through ArduPilot's own
+`norm_input_dz()`: correct signs, 0.73 deg/s worst error. Ignoring the flag
+would invert the whole pitch axis (a +30 deg/s command delivering -29.8
+deg/s), turning the attitude loop into positive feedback. Any future
+rewrite of the PWM mapping must keep reading `RCx_REVERSED`.
 
 ### Other flight blockers (unresolved)
 

@@ -136,6 +136,13 @@ def main():
                     help="altitude setpoint ramp rate [m/s] - see the note above RAMP_RATE "
                          "for why a slower ramp, not an output slew limit, is how takeoff "
                          "gentleness is tuned (ported from ctbr_acro_rc.py's fix)")
+    ap.add_argument("--pos-filter-tc", type=float, default=0.3,
+                    help="low-pass time constant [s] on the x/y POSITION MEASUREMENT before "
+                         "it enters KP_POS/KI_POS (KD_POS stays on the EKF's own, already "
+                         "smoother, velocity - unfiltered). Simulated against 0.5m GPS noise: "
+                         "cuts steady-state pitch swing roughly in half (10.6-15.7deg -> "
+                         "4.9-6.6deg at 0.5) while a real 2m position error settles slightly "
+                         "FASTER (2.3s -> 2.0s), not slower. 0 disables filtering.")
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)
     ap.add_argument("--force-arm", action="store_true")
@@ -153,7 +160,7 @@ def main():
     log = FlightLogger(
         "accbr_acro_rc",
         ["armed", "mode", "alt", "alt_sp", "climb_rate", "a_up", "a_total", "a_cmd", "thrust",
-         "x", "y", "dxy", "vx", "vy", "roll_deg", "pitch_deg", "yaw_deg",
+         "x", "y", "x_filt", "y_filt", "dxy", "vx", "vy", "roll_deg", "pitch_deg", "yaw_deg",
          "roll_ref_deg", "pitch_ref_deg", "roll_rate", "pitch_rate", "yaw_rate",
          "pwm_roll", "pwm_pitch", "pwm_yaw", "pwm_thr",
          "dt_ms", "sched_slip_ms", "att_age_ms", "pos_age_ms"],
@@ -298,8 +305,12 @@ def main():
         time.sleep(0.005)
     yaw_sp = st.yaw
     x_sp, y_sp = st.x, st.y
+    # Filter state starts AT the initial reading, not at 0 - a filter that
+    # starts elsewhere and settles toward x_sp would itself look like a
+    # spurious position error on the very first cycles.
+    x_filt, y_filt = st.x, st.y
     log.event(f"State ok. alt={st.altitude:+.2f} yaw={math.degrees(st.yaw):+.1f} deg "
-              f"start_pos=({st.x:.2f},{st.y:.2f})")
+              f"start_pos=({st.x:.2f},{st.y:.2f}) pos_filter_tc={args.pos_filter_tc:.2f}s")
 
     # ---- controllers: OUTPUTS ARE ACCELERATIONS [m/s2], not thrust ----
     # These gains are physical and stay meaningful whatever MOT_THST_HOVER
@@ -364,10 +375,27 @@ def main():
             # ---------- outer loops produce ACCELERATION, in m/s2 ----------
             a_up = alt_pid.step(alt_sp - st.altitude, st.climb_rate, dt)
 
-            xin = clamp(xin + (x_sp - st.x) * dt, -XY_I_LIM, XY_I_LIM)
-            yin = clamp(yin + (y_sp - st.y) * dt, -XY_I_LIM, XY_I_LIM)
-            a_n = KP_POS * (x_sp - st.x) - KD_POS * st.vx + KI_POS * xin
-            a_e = KP_POS * (y_sp - st.y) - KD_POS * st.vy + KI_POS * yin
+            # Low-pass the POSITION MEASUREMENT before it enters KP_POS/KI_POS -
+            # denoise at the source, not the controller's output (an output-side
+            # filter was tried first and simulated: it did NOT help, and made
+            # things worse at longer time constants - see CLAUDE.md). KD_POS
+            # stays on st.vx/st.vy, the EKF's own velocity estimate, which is
+            # already smoother than a differentiated position would be, so it
+            # is left unfiltered. Simulated against 0.5m GPS noise at the
+            # default 0.3s: steady-state pitch swing roughly halved, while
+            # settling to a REAL 2m position error got slightly FASTER, not
+            # slower (2.3s -> 2.0s) - filtering noise is not the same tradeoff
+            # as filtering signal.
+            if args.pos_filter_tc > 0:
+                x_filt += (st.x - x_filt) * (dt / args.pos_filter_tc)
+                y_filt += (st.y - y_filt) * (dt / args.pos_filter_tc)
+            else:
+                x_filt, y_filt = st.x, st.y
+
+            xin = clamp(xin + (x_sp - x_filt) * dt, -XY_I_LIM, XY_I_LIM)
+            yin = clamp(yin + (y_sp - y_filt) * dt, -XY_I_LIM, XY_I_LIM)
+            a_n = KP_POS * (x_sp - x_filt) - KD_POS * st.vx + KI_POS * xin
+            a_e = KP_POS * (y_sp - y_filt) - KD_POS * st.vy + KI_POS * yin
 
             # Tilt limit applied to the HORIZONTAL acceleration, not to the
             # angles: scaling a_n/a_e together preserves the commanded
@@ -426,7 +454,8 @@ def main():
 
             log.row(st.armed, st.custom_mode, f"{st.altitude:.3f}", f"{alt_sp:.3f}",
                     f"{st.climb_rate:.3f}", f"{a_up:.3f}", f"{a_total:.3f}", f"{a_cmd:.3f}",
-                    f"{thrust:.3f}", f"{st.x:.3f}", f"{st.y:.3f}", f"{dxy:.3f}",
+                    f"{thrust:.3f}", f"{st.x:.3f}", f"{st.y:.3f}", f"{x_filt:.3f}", f"{y_filt:.3f}",
+                    f"{dxy:.3f}",
                     f"{st.vx:.3f}", f"{st.vy:.3f}", f"{math.degrees(st.roll):.2f}",
                     f"{math.degrees(st.pitch):.2f}", f"{math.degrees(st.yaw):.2f}",
                     f"{math.degrees(roll_ref):.2f}", f"{math.degrees(pitch_ref):.2f}",

@@ -146,6 +146,7 @@ run `deploy.sh` against whichever drone(s) need the update.
 | `tools/check_serial_ports.py` | Dumps every `SERIALx_PROTOCOL/BAUD/OPTIONS`. Safe with props on. |
 | `tools/uart_arm_param_test.py` | Params + arm/hold/disarm. `--no-arm` is safe with props on; **arming needs props OFF**. |
 | `tools/arm_disarm_test.py` | Arm, hold `--dwell`, disarm, with motor-PWM evidence. **Props OFF.** |
+| `tools/preflight.py` | One-shot GO/NO-GO field check - link, GPS, EKF, override, fence. Safe with props on. |
 | `test_codes/ctbr_acro_rc.py` | The CTBR flight script (PID -> normalised thrust). **Arms and takes off.** |
 | `test_codes/accbr_acro_rc.py` | ACCBR variant: PID outputs **acceleration** in m/s2, mapped via `T_n = MOT_THST_HOVER * a_total / g`. **Arms and takes off.** |
 
@@ -156,6 +157,35 @@ returns early for every mode whose `has_manual_throttle()` is true, and ACRO's
 (like STABILIZE's) returns true. Learn it by hovering ~30 s in
 ALT_HOLD/LOITER/GUIDED, level and not climbing (filter constant is 10 s), then
 disarm to save. Re-learn after any weight change - the Pi 5 install counts.
+
+## Flight logging
+
+`ctbr_acro_rc.py` logs every run via `companion/lib/flightlog.py` to
+`~/drone-ops/companion/logs/` on the Pi (gitignored - not tracked, not synced
+by `sync.sh`/`deploy.sh`):
+```
+ctbr_acro_rc_<timestamp>.csv          every control cycle: alt, alt_sp, thrust,
+                                       roll/pitch/yaw, position, rates, PWM out
+ctbr_acro_rc_<timestamp>_events.log   lifecycle: params read, mode/arm
+                                       transitions, STATUSTEXT/ACK from the FC
+```
+The logger is registered with `atexit`, so it closes correctly on every exit
+path - normal completion, an early `return` (of which there are several,
+each a refused-to-fly check), `Ctrl-C`, or an unhandled exception. Existing
+2026-08-21 incident data (the altitude-ramp bug) predates this and lives only
+in that conversation's transcript, not as a log file.
+
+Pull logs back to this machine with:
+```
+setup/deploy/fetch_logs.sh <pi-host> <pi-user> [local-dest]
+```
+Defaults to `companion/logs/` here too. Additive (no `--delete`), safe to
+re-run - only fetches what's new.
+
+While investigating the 2026-08-21 incident, the state-wait loop
+(`while not (st.have_att and st.have_pos)`) was also given a 15s timeout: with
+no GPS fix `LOCAL_POSITION_NED` never arrives, and previously the script just
+hung forever with no explanation. It now aborts with a specific message.
 
 `ctbr_acro_rc.py` writes no parameters at all unless `--set-trainer` is
 passed, and treats any unreadable flight-critical parameter as fatal rather

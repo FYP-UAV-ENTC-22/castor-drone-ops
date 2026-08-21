@@ -67,14 +67,28 @@ fi
 # linger and get run by accident. The excludes are what stop that from being
 # destructive: .venv is built on the Pi and is NOT in git, so losing it would
 # mean reinstalling pymavlink over a link that may have no internet.
+#
+# .vscode/ and .idea/ are excluded because they are IDE-local, not part of
+# the codebase, and can be huge: this project's .vscode/browse.vc.db (a VS
+# Code C/C++ extension symbol cache, actively rewritten while the editor is
+# open) is over 1GB. A sync once tried to push that whole file over the FFT
+# link and looked exactly like a hang - rsync was making real progress, just
+# at the effective throughput of a long-range wifi link carrying a gigabyte.
+# --max-size is a general safety net beyond named excludes: nothing this
+# project actually needs on the Pi is anywhere near 20M, so anything that
+# size gets skipped (rsync prints which, does not fail the transfer) rather
+# than silently turning a code sync into a multi-minute-or-longer transfer.
 echo "Syncing $REPO_DIR -> $PI_USER@$PI_HOST:~/drone-ops/"
 # shellcheck disable=SC2086
 rsync -az --delete $DRY \
     --itemize-changes \
+    --max-size=20M \
     --exclude '.git/' \
     --exclude '.venv/' \
     --exclude '__pycache__/' \
     --exclude '*.pyc' \
+    --exclude '.vscode/' \
+    --exclude '.idea/' \
     -e "ssh -o BatchMode=yes -o ConnectTimeout=8" \
     "$REPO_DIR/" "$PI_USER@$PI_HOST:$DEST"
 

@@ -16,10 +16,24 @@ import os
 import time
 
 
+def _default_log_dir():
+    """companion/logs/, found relative to this file rather than the user's
+    home directory. os.path.expanduser("~") depends on $HOME, and plain
+    `sudo` (the default env_reset) resets $HOME to /root - every documented
+    way of running ctbr_acro_rc.py uses sudo, so a home-relative path
+    silently wrote logs to /root/drone-ops/..., invisible without sudo and
+    unreachable by fetch_logs.sh (which runs unprivileged). Found the hard
+    way: two real flights' logs sat there until recovered by hand. Deriving
+    the path from __file__ instead is correct regardless of who invokes it,
+    with sudo or without.
+    """
+    lib_dir = os.path.dirname(os.path.abspath(__file__))          # companion/lib
+    return os.path.join(lib_dir, "..", "logs")                    # companion/logs
+
+
 class FlightLogger:
     def __init__(self, name, columns, log_dir=None):
-        self.log_dir = log_dir or os.path.join(
-            os.path.expanduser("~"), "drone-ops", "companion", "logs")
+        self.log_dir = log_dir or _default_log_dir()
         os.makedirs(self.log_dir, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         self.csv_path = os.path.join(self.log_dir, f"{name}_{stamp}.csv")

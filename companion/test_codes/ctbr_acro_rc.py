@@ -152,6 +152,17 @@ class State:
         self.armed = False
         self.custom_mode = None
         self.have_att = self.have_pos = False
+        # perf_counter() timestamp of the last ATTITUDE / LOCAL_POSITION_NED
+        # actually received, so the control loop can measure how STALE the
+        # state it is acting on is - separate from whether the loop itself
+        # is keeping up with its own 100Hz schedule. Distinguishes "FC/link
+        # not delivering fresh data fast enough" from "the Pi's own loop is
+        # falling behind" - the two latency hypotheses raised after the
+        # lurching incident, and previously indistinguishable since neither
+        # was logged (only a 1Hz console string existed, never written to
+        # the CSV).
+        self.att_time = None
+        self.pos_time = None
 
     @property
     def altitude(self):
@@ -333,11 +344,13 @@ def drain(m, st, mon, log=None):
         elif t == "ATTITUDE":
             st.roll, st.pitch, st.yaw = msg.roll, msg.pitch, msg.yaw
             st.have_att = True
+            st.att_time = time.perf_counter()
             mon.rx("ATT", msg.time_boot_ms)
         elif t == "LOCAL_POSITION_NED":
             st.x, st.y, st.z = msg.x, msg.y, msg.z
             st.vx, st.vy, st.vz = msg.vx, msg.vy, msg.vz
             st.have_pos = True
+            st.pos_time = time.perf_counter()
             mon.rx("POS", msg.time_boot_ms)
         elif t == "STATUSTEXT":
             text = f"[AP] {msg.text}"
@@ -387,7 +400,15 @@ def main():
         "ctbr_acro_rc",
         ["armed", "mode", "alt", "alt_sp", "climb_rate", "thrust_v", "thrust", "cos_tilt",
          "x", "y", "dxy", "vx", "vy", "roll_deg", "pitch_deg", "yaw_deg",
-         "roll_rate", "pitch_rate", "yaw_rate", "pwm_roll", "pwm_pitch", "pwm_yaw", "pwm_thr"],
+         "roll_rate", "pitch_rate", "yaw_rate", "pwm_roll", "pwm_pitch", "pwm_yaw", "pwm_thr",
+         # latency diagnostics: dt_ms/sched_slip_ms show whether THIS SCRIPT's
+         # own loop is keeping up with its 100Hz schedule (Pi-side); att_age_ms/
+         # pos_age_ms show how stale the state being acted on is, i.e. whether
+         # the FC/link is actually delivering fresh ATTITUDE/LOCAL_POSITION_NED
+         # every cycle or falling behind (FC/link-side). Added specifically to
+         # separate these two hypotheses after a hovering-phase "large slow
+         # lurch" report with no surviving log to check against.
+         "dt_ms", "sched_slip_ms", "att_age_ms", "pos_age_ms"],
         log_dir=args.log_dir,
     )
     log.event(f"args: {vars(args)}")
@@ -625,7 +646,7 @@ def main():
     ground_alt = st.altitude
     T = 1.0 / args.freq
     t0 = time.perf_counter(); t_start = t0
-    next_t = t0; last_report = t0; last_loop = t0; jit = 0.0
+    next_t = t0; last_report = t0; last_loop = t0; jit = 0.0; was_stale = False
 
     try:
         while True:
@@ -680,6 +701,20 @@ def main():
             send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, pwm, mon)
 
             dxy = math.hypot(x_sp - st.x, y_sp - st.y)
+            # Latency diagnostics, split by hypothesis:
+            #   sched_slip - how far THIS cycle ran from its intended 100Hz
+            #     slot (now vs. when it was supposed to start). Large/growing
+            #     slip = the Pi-side Python loop itself is falling behind.
+            #   att_age / pos_age - time since ATTITUDE / LOCAL_POSITION_NED
+            #     was last actually RECEIVED, independent of loop timing.
+            #     Large/growing age = the FC or the link isn't delivering
+            #     fresh state every cycle, regardless of how promptly this
+            #     script is running - i.e. FC/link-side, not Pi-side.
+            # A none/nan age (state never arrived even once) prints as "nan".
+            sched_slip = now - (next_t - T)
+            att_age = (now - st.att_time) if st.att_time is not None else float("nan")
+            pos_age = (now - st.pos_time) if st.pos_time is not None else float("nan")
+
             # every control cycle, not just the 1Hz console print - this is the
             # resolution that would have made the 2026-08-21 incident review
             # immediate instead of inferred from a 1Hz text log
@@ -689,14 +724,33 @@ def main():
                     f"{math.degrees(st.roll):.2f}", f"{math.degrees(st.pitch):.2f}",
                     f"{math.degrees(st.yaw):.2f}", f"{roll_rate:.3f}", f"{pitch_rate:.3f}",
                     f"{yaw_rate:.3f}", pwm[cmap["ROLL"]], pwm[cmap["PITCH"]],
-                    pwm[cmap["YAW"]], pwm[cmap["THROTTLE"]])
+                    pwm[cmap["YAW"]], pwm[cmap["THROTTLE"]],
+                    f"{dt*1000:.2f}", f"{sched_slip*1000:.2f}",
+                    f"{att_age*1000:.2f}", f"{pos_age*1000:.2f}")
 
-            jit = max(jit, abs(now - (next_t - T)))
+            # Flag it in the event log too, not just buried in the CSV - but
+            # only on the onset/recovery transition, not every cycle while it
+            # persists, or a sustained stale period would flood the log with
+            # one line per 10ms cycle. >30ms is 3x the 10ms cycle period at
+            # 100Hz, a real problem either way.
+            STALE_MS = 30.0
+            is_stale = att_age * 1000 > STALE_MS or pos_age * 1000 > STALE_MS
+            if is_stale and not was_stale:
+                log.event(f"[!] state went stale: att_age={att_age*1000:.0f}ms "
+                          f"pos_age={pos_age*1000:.0f}ms (>{STALE_MS:.0f}ms threshold) "
+                          f"at alt={st.altitude:+.2f} dxy={dxy:.2f}")
+            elif was_stale and not is_stale:
+                log.event(f"state fresh again: att_age={att_age*1000:.0f}ms "
+                          f"pos_age={pos_age*1000:.0f}ms")
+            was_stale = is_stale
+
+            jit = max(jit, abs(sched_slip))
             if now - last_report >= 1.0:
                 print(f"alt={st.altitude:+.2f}(sp{alt_sp:+.2f}) dxy={dxy:4.2f} "
                       f"thr={thrust:.2f}(v{thrust_v:.2f}) "
                       f"thrPWM={pwm[cmap['THROTTLE']]} r={math.degrees(st.roll):+5.1f} "
-                      f"p={math.degrees(st.pitch):+5.1f} | {mon.report()} | jit<={jit*1e3:4.1f}ms")
+                      f"p={math.degrees(st.pitch):+5.1f} | {mon.report()} | jit<={jit*1e3:4.1f}ms "
+                      f"att_age={att_age*1e3:4.1f}ms pos_age={pos_age*1e3:4.1f}ms")
                 last_report = now; jit = 0.0
 
             next_t += T

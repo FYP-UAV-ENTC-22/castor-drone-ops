@@ -27,9 +27,19 @@ script only verifies ACRO_TRAINER == 0 and refuses to run otherwise. Pass
 exit; that is the only parameter write in this script.
 
 Control (all done here; ArduPilot only runs the inner rate loop):
-    altitude PID          -> collective thrust
-    x/y position PID -> tilt ref -> attitude P -> roll/pitch body rate
-    yaw hold P            -> yaw body rate
+    altitude PID -> vertical thrust -> /cos(tilt) -> collective thrust
+    x/y position PID -> tilt ref -> attitude P -> roll/pitch euler rate
+    yaw hold P                                  -> yaw euler rate
+    (euler rates -> BODY rates before they are sent; see euler_rates_to_body)
+
+Two things ACRO does NOT do for us, and which the CTBR command therefore has
+to account for here:
+  * no angle boost - mode_acro.cpp calls set_throttle_out(thr, false, ...), so
+    the collective we send is thrust along body z, not lift. It is divided by
+    cos(roll)cos(pitch) here or the aircraft sinks whenever it tilts.
+  * a CIRCULAR limit on the roll/pitch stick pair - if norm(roll_in, pitch_in)
+    exceeds 1 ArduPilot scales both down, and it does so AFTER our expo
+    inversion. build_pwm() applies the same limit first so the FC's never fires.
 
 Setup:
     Real hardware (drone1) over the USB link - the one confirmed bidirectional:
@@ -63,6 +73,23 @@ def wrap_pi(a):
 
 def clamp(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
+
+
+def euler_rates_to_body(roll, pitch, roll_dot, pitch_dot, yaw_dot):
+    """Euler (321) rate command -> body-frame rate command.
+
+    ACRO's request is `rate_bf_request` - a BODY rate - but the P loops here act
+    on euler angles and so produce euler rates. The two only coincide at zero
+    tilt. The yaw term is the one that bites: holding heading at 1.5 rad/s while
+    pitched 12 deg leaks ~0.3 rad/s (10% of RATE_LIM) into the roll axis if the
+    euler rates are sent as if they were body rates.
+    """
+    sr, cr = math.sin(roll), math.cos(roll)
+    sp, cp = math.sin(pitch), math.cos(pitch)
+    p = roll_dot - sp * yaw_dot
+    q = cr * pitch_dot + sr * cp * yaw_dot
+    r = -sr * pitch_dot + cr * cp * yaw_dot
+    return p, q, r
 
 
 class PID:
@@ -411,7 +438,8 @@ def main():
         print("[!] This script does not write parameters. Set these on the FC "
               "yourself (Mission Planner / QGroundControl), then re-run.")
         return
-    print("[i] Config verified: ACRO trainer/expo and rate-channel deadzones are zero.")
+    print("[i] Config verified: ACRO_TRAINER is 0 (expo and deadzones are "
+          "compensated in software, so any value is fine).")
 
     def chan(ch):
         return Chan(require(f"RC{ch}_MIN"), require(f"RC{ch}_MAX"),
@@ -449,17 +477,30 @@ def main():
         print(f"[!] Implausible rate limits from FC (rp={acro_rp_rate}, y={acro_y_rate}) - aborting.")
         return
 
-    def rate_to_pwm(rate_rads, rate_max_degs, ch, expo):
+    def rate_to_norm(rate_rads, rate_max_degs, expo):
         # AP computes rate = ACRO_*_RATE * input_expo(norm_in, expo), so undo the
         # expo to find the norm_in that yields the rate we actually want.
         n = clamp(math.degrees(rate_rads) / rate_max_degs, -1.0, 1.0)
-        return ch.pwm_from_norm(expo_inverse(n, expo))
+        return expo_inverse(n, expo)
 
     def build_pwm(roll_rate, pitch_rate, yaw_rate, thrust):
+        """Body rates [rad/s] + collective [0..1] -> the PWM that asks for them."""
+        n_roll = rate_to_norm(roll_rate, acro_rp_rate, acro_rp_expo)
+        n_pitch = rate_to_norm(pitch_rate, acro_rp_rate, acro_rp_expo)
+        # ArduPilot limits the roll/pitch stick pair to the unit CIRCLE before it
+        # applies expo (mode_acro.cpp get_pilot_desired_angle_rates). If we let
+        # that fire on the FC it rescales inputs we have already expo-inverted,
+        # so both the magnitude AND the roll:pitch ratio of the delivered rates
+        # come out wrong. Applying the identical limit to the identical quantity
+        # here makes the FC's copy a no-op, and the rates become predictable.
+        total = math.hypot(n_roll, n_pitch)
+        if total > 1.0:
+            n_roll /= total
+            n_pitch /= total
         return {
-            cmap["ROLL"]:     rate_to_pwm(roll_rate, acro_rp_rate, ch_roll, acro_rp_expo),
-            cmap["PITCH"]:    rate_to_pwm(pitch_rate, acro_rp_rate, ch_pitch, acro_rp_expo),
-            cmap["YAW"]:      rate_to_pwm(yaw_rate, acro_y_rate, ch_yaw, acro_y_expo),
+            cmap["ROLL"]:     ch_roll.pwm_from_norm(n_roll),
+            cmap["PITCH"]:    ch_pitch.pwm_from_norm(n_pitch),
+            cmap["YAW"]:      ch_yaw.pwm_from_norm(rate_to_norm(yaw_rate, acro_y_rate, acro_y_expo)),
             cmap["THROTTLE"]: thrust_to_pwm(thrust, thr_mid, mid_stick, ch_thr),
         }
 
@@ -476,7 +517,11 @@ def main():
     print(f"[i] State ok. alt={st.altitude:+.2f} yaw={math.degrees(st.yaw):+.1f} deg")
 
     # ---- controllers ----
-    alt_pid = PID(kp=0.35, ki=0.15, kd=0.30, i_limit=0.4, out_lo=0.0, out_hi=0.95)
+    THRUST_MAX = 0.95
+    # floor for the 1/cos(tilt) collective boost: past 45 deg the aircraft is no
+    # longer hovering and the divisor must not be allowed to run away.
+    COS_TILT_MIN = math.cos(math.radians(45.0))
+    alt_pid = PID(kp=0.35, ki=0.15, kd=0.30, i_limit=0.4, out_lo=0.0, out_hi=THRUST_MAX)
     KP_ATT = 6.0; RATE_LIM = 3.0
     KP_YAW = 2.5; YAW_LIM = 1.5
     KP_POS = 0.5; KD_POS = 1.0; KI_POS = 0.15; TILT_MAX = math.radians(12.0); G = 9.81
@@ -525,8 +570,15 @@ def main():
             if climb_t > args.hold:
                 break
 
-            # altitude PID -> thrust (feedforward = hover throttle)
-            thrust = alt_pid.step(alt_sp - st.altitude, st.climb_rate, dt, ff=thr_mid)
+            # altitude PID -> VERTICAL thrust (feedforward = hover throttle)
+            thrust_v = alt_pid.step(alt_sp - st.altitude, st.climb_rate, dt, ff=thr_mid)
+            # ACRO hands the pilot collective to the motors with no angle boost
+            # (mode_acro.cpp: set_throttle_out(thr, false, ...)), so the number we
+            # send is thrust along body z. Tilted, only cos(tilt) of it holds the
+            # aircraft up - uncompensated, every position correction is also a
+            # descent. AC_AttitudeControl's own boost is exactly this ratio.
+            cos_tilt = max(math.cos(st.roll) * math.cos(st.pitch), COS_TILT_MIN)
+            thrust = clamp(thrust_v / cos_tilt, 0.0, THRUST_MAX)
 
             # position PD(+I) -> desired accel -> tilt ref
             xin = clamp(xin + (x_sp - st.x) * dt, -XY_I / max(KI_POS, 1e-6), XY_I / max(KI_POS, 1e-6))
@@ -539,19 +591,27 @@ def main():
             roll_ref = clamp(a_rgt / G, -TILT_MAX, TILT_MAX)
             pitch_ref = clamp(-a_fwd / G, -TILT_MAX, TILT_MAX)
 
-            # attitude P -> body rates
-            roll_rate = clamp(KP_ATT * (roll_ref - st.roll), -RATE_LIM, RATE_LIM)
-            pitch_rate = clamp(KP_ATT * (pitch_ref - st.pitch), -RATE_LIM, RATE_LIM)
-            yaw_rate = clamp(KP_YAW * wrap_pi(yaw_sp - st.yaw), -YAW_LIM, YAW_LIM)
+            # attitude P -> EULER rates (these loops act on euler angles)
+            roll_dot = clamp(KP_ATT * (roll_ref - st.roll), -RATE_LIM, RATE_LIM)
+            pitch_dot = clamp(KP_ATT * (pitch_ref - st.pitch), -RATE_LIM, RATE_LIM)
+            yaw_dot = clamp(KP_YAW * wrap_pi(yaw_sp - st.yaw), -YAW_LIM, YAW_LIM)
 
-            send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw,
-                    build_pwm(roll_rate, pitch_rate, yaw_rate, thrust), mon)
+            # ... and ACRO wants BODY rates. Convert, then re-clamp: the mixing
+            # can push an axis past the limit the euler clamp above enforced.
+            roll_rate, pitch_rate, yaw_rate = euler_rates_to_body(
+                st.roll, st.pitch, roll_dot, pitch_dot, yaw_dot)
+            roll_rate = clamp(roll_rate, -RATE_LIM, RATE_LIM)
+            pitch_rate = clamp(pitch_rate, -RATE_LIM, RATE_LIM)
+            yaw_rate = clamp(yaw_rate, -YAW_LIM, YAW_LIM)
+
+            pwm = build_pwm(roll_rate, pitch_rate, yaw_rate, thrust)
+            send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, pwm, mon)
 
             jit = max(jit, abs(now - (next_t - T)))
             if now - last_report >= 1.0:
                 dxy = math.hypot(x_sp - st.x, y_sp - st.y)
-                pwm = build_pwm(roll_rate, pitch_rate, yaw_rate, thrust)
-                print(f"alt={st.altitude:+.2f}(sp{alt_sp:+.2f}) dxy={dxy:4.2f} thr={thrust:.2f} "
+                print(f"alt={st.altitude:+.2f}(sp{alt_sp:+.2f}) dxy={dxy:4.2f} "
+                      f"thr={thrust:.2f}(v{thrust_v:.2f}) "
                       f"thrPWM={pwm[cmap['THROTTLE']]} r={math.degrees(st.roll):+5.1f} "
                       f"p={math.degrees(st.pitch):+5.1f} | {mon.report()} | jit<={jit*1e3:4.1f}ms")
                 last_report = now; jit = 0.0

@@ -130,7 +130,16 @@ run `deploy.sh` against whichever drone(s) need the update.
 | `tools/check_serial_ports.py` | Dumps every `SERIALx_PROTOCOL/BAUD/OPTIONS`. Safe with props on. |
 | `tools/uart_arm_param_test.py` | Params + arm/hold/disarm. `--no-arm` is safe with props on; **arming needs props OFF**. |
 | `tools/arm_disarm_test.py` | Arm, hold `--dwell`, disarm, with motor-PWM evidence. **Props OFF.** |
-| `test_codes/ctbr_acro_rc.py` | The CTBR flight script. **Arms and takes off.** |
+| `test_codes/ctbr_acro_rc.py` | The CTBR flight script (PID -> normalised thrust). **Arms and takes off.** |
+| `test_codes/accbr_acro_rc.py` | ACCBR variant: PID outputs **acceleration** in m/s2, mapped via `T_n = MOT_THST_HOVER * a_total / g`. **Arms and takes off.** |
+
+`accbr_acro_rc.py` needs a **learned** `MOT_THST_HOVER` - that parameter is the
+entire acceleration scale, so the script refuses to run while it is still
+ArduPilot's `0.35` default. ACRO can never learn it: `Copter::update_throttle_hover()`
+returns early for every mode whose `has_manual_throttle()` is true, and ACRO's
+(like STABILIZE's) returns true. Learn it by hovering ~30 s in
+ALT_HOLD/LOITER/GUIDED, level and not climbing (filter constant is 10 s), then
+disarm to save. Re-learn after any weight change - the Pi 5 install counts.
 
 `ctbr_acro_rc.py` writes no parameters at all unless `--set-trainer` is
 passed, and treats any unreadable flight-critical parameter as fatal rather

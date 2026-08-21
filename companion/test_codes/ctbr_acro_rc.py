@@ -42,14 +42,21 @@ to account for here:
     inversion. build_pwm() applies the same limit first so the FC's never fires.
 
 Setup:
-    Real hardware (drone1) over the USB link - the one confirmed bidirectional:
+    Default is the GPIO UART - the link intended for flight, because a soldered
+    UART tolerates vibration and ESC noise far better than a USB connector:
         python3 ctbr_acro_rc.py --alt 1
-        (defaults to --connect /dev/ttyACM0 --baud 115200)
+        (defaults to --connect /dev/ttyAMA0 --baud 57600)
 
-    Over the GPIO UART instead (NOTE: on drone1 this link is currently
-    receive-only - the FC's heartbeats arrive but nothing we send reaches it,
-    so this will hang at wait_heartbeat's first param write):
-        python3 ctbr_acro_rc.py --connect /dev/ttyAMA0 --baud 57600 --alt 1
+    WARNING: on drone1 that UART is currently INTERMITTENT in the Pi->FC
+    direction. Measured across four runs with nothing changed between them:
+    0 replies, then success on attempt 1, then 11/16, then 0/13 in 141.7s.
+    FC->Pi is fine throughout. When it is failing this script aborts cleanly
+    on the parameter reads rather than flying with defaults - but verify with
+    `companion/tools/uart_arm_param_test.py --no-arm` (expect 13/13 in a few
+    seconds) before trusting it.
+
+    Over USB instead - bidirectional, though it re-enumerated once mid-session:
+        python3 ctbr_acro_rc.py --connect /dev/ttyACM0 --baud 115200 --alt 1
 
     SITL - connect DIRECTLY, not through MAVProxy, so streams hit 100 Hz:
         python3 ctbr_acro_rc.py --connect tcp:127.0.0.1:5762 --alt 1

@@ -78,6 +78,18 @@ fi
 # project actually needs on the Pi is anywhere near 20M, so anything that
 # size gets skipped (rsync prints which, does not fail the transfer) rather
 # than silently turning a code sync into a multi-minute-or-longer transfer.
+#
+# companion/logs/ MUST stay excluded, permanently. It is a one-way,
+# Pi-only directory - flight logs are generated there and nowhere else,
+# never exist on this machine, and are gitignored. Without this exclude,
+# --delete mirrors this machine's (nonexistent) copy of that directory
+# onto the Pi, i.e. it deletes every flight log the Pi has. This is not
+# hypothetical: it happened for real on 2026-08-21, deleting the CSV/event
+# logs from the user's first two test flights minutes after they were
+# hand-recovered from a separate bug (see flightlog.py's _default_log_dir
+# docstring). They were not recoverable afterward. If you ever need to
+# wipe logs from the Pi deliberately, do it explicitly over ssh - never by
+# removing this exclude.
 echo "Syncing $REPO_DIR -> $PI_USER@$PI_HOST:~/drone-ops/"
 # shellcheck disable=SC2086
 rsync -az --delete $DRY \
@@ -89,6 +101,7 @@ rsync -az --delete $DRY \
     --exclude '*.pyc' \
     --exclude '.vscode/' \
     --exclude '.idea/' \
+    --exclude 'companion/logs/' \
     -e "ssh -o BatchMode=yes -o ConnectTimeout=8" \
     "$REPO_DIR/" "$PI_USER@$PI_HOST:$DEST"
 

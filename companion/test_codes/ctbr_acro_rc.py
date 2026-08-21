@@ -524,6 +524,18 @@ def main():
     print(f"[i] State ok. alt={st.altitude:+.2f} yaw={math.degrees(st.yaw):+.1f} deg")
 
     # ---- controllers ----
+    # Altitude setpoint ramps at this rate (m/s) from ground_alt up to --alt,
+    # then holds. There is deliberately no separate "ramp for N seconds, then
+    # snap to the target" branch: for --alt 1 the old code's fixed 2s ramp
+    # happened to reach exactly 1m at climb_t=2 and the snap was invisible,
+    # but for --alt 3 the ramped value was only 1m at that instant while the
+    # snap jumped the setpoint straight to 3m - a 2m instantaneous step while
+    # still on the ground. That produced max commanded thrust into a large
+    # attitude/position excursion during the 2026-08-21 outdoor test (roll
+    # briefly read 180 deg, altitude overshot to 9.7m against a 3m target,
+    # position drifted ~7m before the loops recovered). This form ramps to
+    # any --alt at a constant rate with no discontinuity, ever.
+    RAMP_RATE = 0.5
     THRUST_MAX = 0.95
     # floor for the 1/cos(tilt) collective boost: past 45 deg the aircraft is no
     # longer hovering and the divisor must not be allowed to run away.
@@ -571,9 +583,10 @@ def main():
                 dt = T
             drain(m, st, mon)
 
-            # altitude setpoint: ramp up from ground over 2 s, then hold
+            # altitude setpoint: ramp from ground at RAMP_RATE up to --alt, then hold.
+            # No branch, no snap - see the note on RAMP_RATE above for why that matters.
             climb_t = now - t_start
-            alt_sp = ground_alt + min(args.alt, 0.5 * climb_t) if climb_t < 2.0 else ground_alt + args.alt
+            alt_sp = ground_alt + min(args.alt, RAMP_RATE * climb_t)
             if climb_t > args.hold:
                 break
 

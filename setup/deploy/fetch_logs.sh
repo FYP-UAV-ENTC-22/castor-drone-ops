@@ -26,11 +26,24 @@ if ! command -v rsync >/dev/null 2>&1; then
 fi
 
 mkdir -p "$DEST"
+
+# Check the remote logs/ dir exists before invoking rsync: if nothing has
+# flown since the logger was added, it won't, and rsync's failure message
+# for that case ("No such file or directory") is easy to mistake for a real
+# transfer error rather than the expected "nothing to fetch yet".
+if ! ssh -o BatchMode=yes -o ConnectTimeout=8 "$PI_USER@$PI_HOST" \
+        '[ -d drone-ops/companion/logs ]'; then
+    echo "No logs directory on $PI_HOST yet - nothing has been flown since"
+    echo "flight logging was added. Nothing to fetch."
+    exit 0
+fi
+
 echo "Fetching logs from $PI_USER@$PI_HOST:~/drone-ops/companion/logs/ -> $DEST/"
 rsync -az --itemize-changes \
     -e "ssh -o BatchMode=yes -o ConnectTimeout=8" \
-    "$PI_USER@$PI_HOST:drone-ops/companion/logs/" "$DEST/" \
-    2>&1 | grep -v '^$' || echo "(nothing new)"
+    "$PI_USER@$PI_HOST:drone-ops/companion/logs/" "$DEST/"
+# set -e means we only get here on success; itemize-changes already printed
+# what moved (or nothing, if everything was already up to date locally)
 
 echo
 echo "Logs are in $DEST"

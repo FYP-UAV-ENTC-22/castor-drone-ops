@@ -163,6 +163,14 @@ touch it, so re-run the pip install step after `requirements.txt` changes.
 
 ## Known TODOs / flagged issues
 
+- **Pending next time drone1 is powered on: check for / install `rsync`**
+  (needed by `setup/deploy/sync.sh`). It may already be present - Ubuntu
+  usually ships it - so check before installing. Note the ordering trap:
+  `apt-get install` needs internet on the Pi, which means the NAT gateway
+  must be up first (`setup/network-gateway/base_station_setup.sh`). So this
+  one-off setup step depends on the very thing `sync.sh` exists to avoid.
+  Also worth clearing a possible stale `~/drone-ops/.git/index.lock` left by
+  a `deploy.sh` pull that was interrupted when the drone was switched off.
 - **drone1's GitHub deploy key currently has write access, not read-only
   as intended.** Caught by testing an actual push (it succeeded and had
   to be reverted - see git history around 2026-08-20). User was informed

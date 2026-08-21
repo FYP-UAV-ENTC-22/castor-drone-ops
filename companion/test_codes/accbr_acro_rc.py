@@ -62,6 +62,8 @@ Bench-test with propellers OFF before ever running it against real hardware.
 import argparse
 import atexit
 import math
+import os
+import sys
 import time
 
 from pymavlink import mavutil
@@ -74,6 +76,9 @@ from ctbr_acro_rc import (
     send_rc, set_mode_confirm, set_msg_interval, set_param, thrust_to_pwm,
     wrap_pi,
 )
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+from flightlog import FlightLogger  # noqa: E402
 
 G = 9.80665
 
@@ -127,6 +132,10 @@ def main():
     ap.add_argument("--baud", type=int, default=115200,
                     help="baud for serial targets: USB 115200, GPIO UART 57600")
     ap.add_argument("--alt", type=float, default=1.0, help="hover height [m]")
+    ap.add_argument("--climb-rate", type=float, default=0.3,
+                    help="altitude setpoint ramp rate [m/s] - see the note above RAMP_RATE "
+                         "for why a slower ramp, not an output slew limit, is how takeoff "
+                         "gentleness is tuned (ported from ctbr_acro_rc.py's fix)")
     ap.add_argument("--freq", type=float, default=100.0)
     ap.add_argument("--hold", type=float, default=20.0)
     ap.add_argument("--force-arm", action="store_true")
@@ -137,12 +146,26 @@ def main():
                     help="fly even though MOT_THST_HOVER is still the 0.35 default. "
                          "That value was never learned, so every acceleration command "
                          "is scaled by a guess. Do not use this in the air.")
+    ap.add_argument("--log-dir", default=None,
+                    help="where to write flight logs (default ~/drone-ops/companion/logs)")
     args = ap.parse_args()
+
+    log = FlightLogger(
+        "accbr_acro_rc",
+        ["armed", "mode", "alt", "alt_sp", "climb_rate", "a_up", "a_total", "a_cmd", "thrust",
+         "x", "y", "dxy", "vx", "vy", "roll_deg", "pitch_deg", "yaw_deg",
+         "roll_ref_deg", "pitch_ref_deg", "roll_rate", "pitch_rate", "yaw_rate",
+         "pwm_roll", "pwm_pitch", "pwm_yaw", "pwm_thr",
+         "dt_ms", "sched_slip_ms", "att_age_ms", "pos_age_ms"],
+        log_dir=args.log_dir,
+    )
+    log.event(f"args: {vars(args)}")
+    atexit.register(log.close)   # closes on every exit path: early return, Ctrl-C, or crash
 
     print(f"[i] Connecting to {args.connect} (baud={args.baud} if serial) ...")
     m = mavutil.mavlink_connection(args.connect, baud=args.baud, source_system=255)
     m.wait_heartbeat()
-    print(f"[i] Heartbeat sys {m.target_system}")
+    log.event(f"Heartbeat sys {m.target_system}")
     for _ in range(3):                      # identify as a GCS before param traffic
         gcs_heartbeat(m)
         time.sleep(0.1)
@@ -158,15 +181,15 @@ def main():
 
     cmap = {k: int(require(f"RCMAP_{k}")) for k in ("ROLL", "PITCH", "THROTTLE", "YAW")}
     if missing:
-        print(f"[!] Could not read the RC channel map from the FC: {missing}")
-        print("[!] Refusing to run - the maths would silently use wrong channels.")
+        log.event(f"[!] Could not read the RC channel map from the FC: {missing}")
+        log.event("[!] Refusing to run - the maths would silently use wrong channels.")
         return
 
     # ---- ACRO_TRAINER: the one thing that cannot be compensated in software ----
     if args.set_trainer:
         trainer_original = get_param(m, "ACRO_TRAINER")
         if trainer_original is None:
-            print("[!] Could not read ACRO_TRAINER - refusing to overwrite it blindly.")
+            log.event("[!] Could not read ACRO_TRAINER - refusing to overwrite it blindly.")
             return
         if abs(trainer_original) > 1e-6:
             def restore_trainer(value=trainer_original):
@@ -174,22 +197,22 @@ def main():
                     set_param(m, "ACRO_TRAINER", value)
                     back = get_param(m, "ACRO_TRAINER")
                     if back is not None and abs(back - value) < 1e-6:
-                        print(f"[i] ACRO_TRAINER restored to {value:g}.")
+                        log.event(f"ACRO_TRAINER restored to {value:g}.")
                         return
-                print(f"[!] FAILED to restore ACRO_TRAINER. Set it back to {value:g} "
-                      f"manually before flying with a transmitter.")
-            atexit.register(restore_trainer)
+                log.event(f"[!] FAILED to restore ACRO_TRAINER. Set it back to {value:g} "
+                          f"manually before flying with a transmitter.")
+            atexit.register(restore_trainer)   # registered AFTER log.close so it runs first (LIFO)
             set_param(m, "ACRO_TRAINER", 0)
             confirmed = get_param(m, "ACRO_TRAINER")
             if confirmed is None or abs(confirmed) > 1e-6:
-                print("[!] ACRO_TRAINER write was not confirmed by the FC - aborting.")
+                log.event("[!] ACRO_TRAINER write was not confirmed by the FC - aborting.")
                 return
-            print(f"[i] ACRO_TRAINER temporarily 0 (was {trainer_original:g}).")
+            log.event(f"ACRO_TRAINER temporarily 0 (was {trainer_original:g}).")
 
     trainer = get_param(m, "ACRO_TRAINER")
     if trainer is None or abs(trainer) > 1e-6:
-        print(f"[!] ACRO_TRAINER = {trainer}, must be 0. ArduPilot would add its own "
-              "earth-frame levelling rate that no RC value can cancel.")
+        log.event(f"[!] ACRO_TRAINER = {trainer}, must be 0. ArduPilot would add its own "
+                  "earth-frame levelling rate that no RC value can cancel.")
         return
 
     # ---- RC calibration + ACRO rate model ----
@@ -206,18 +229,15 @@ def main():
     mid_stick = float(get_param(m, "THR_MID") or 500.0)
 
     if missing:
-        print(f"[!] {len(missing)} flight-critical parameter(s) unreadable after retries:")
-        for name in missing:
-            print(f"      {name}")
-        print("[!] Refusing to run - defaulting these means flying on a guess.")
+        log.event(f"[!] {len(missing)} flight-critical parameter(s) unreadable after retries: {missing}")
+        log.event("[!] Refusing to run - defaulting these means flying on a guess.")
         return
     if acro_rp_rate <= 0 or acro_y_rate <= 0:
-        print(f"[!] Implausible rate limits (rp={acro_rp_rate}, y={acro_y_rate}) - aborting.")
+        log.event(f"[!] Implausible rate limits (rp={acro_rp_rate}, y={acro_y_rate}) - aborting.")
         return
 
     # ---- read-only preflight: everything the thrust mapping depends on ----
-    print("\n[i] Thrust mapping inputs (read-only):")
-    print(f"      MOT_THST_HOVER = {thr_hover:.4f}   <- the entire acceleration scale")
+    log.event(f"Thrust mapping inputs: MOT_THST_HOVER={thr_hover:.4f} (the entire accel scale)")
     for name, note in (("MOT_THST_EXPO", "motor curve ArduPilot inverts"),
                        ("MOT_HOVER_LEARN", "2 = learn and save on disarm"),
                        ("MOT_SPIN_ARM", "idle, below which thrust is not proportional"),
@@ -229,26 +249,24 @@ def main():
                        ("ACRO_Y_RATE_TC", "")):
         v = get_param(m, name)
         shown = "unreadable" if v is None else f"{v:g}"
-        print(f"      {name:<17}= {shown:<10} {note}")
+        log.event(f"    {name:<17}= {shown:<10} {note}")
 
     if abs(thr_hover - HOVER_NEVER_LEARNED) < 1e-6:
-        print(f"\n[!] MOT_THST_HOVER is exactly {HOVER_NEVER_LEARNED} - ArduPilot's "
-              "never-learned default.")
-        print("[!] Every acceleration command would be scaled by a guess.")
-        print("[!] ACRO cannot learn it (Copter::update_throttle_hover() skips all")
-        print("[!] manual-throttle modes). Hover ~30 s in ALT_HOLD/LOITER/GUIDED,")
-        print("[!] level and not climbing, then disarm to save it.")
+        log.event(f"[!] MOT_THST_HOVER is exactly {HOVER_NEVER_LEARNED} - ArduPilot's "
+                  "never-learned default. Every acceleration command would be scaled "
+                  "by a guess. ACRO cannot learn it - hover ~30s in ALT_HOLD/LOITER/"
+                  "GUIDED, level and not climbing, then disarm to save it.")
         if not args.accept_default_hover:
-            print("[!] Refusing to run. Override with --accept-default-hover (props off).")
+            log.event("[!] Refusing to run. Override with --accept-default-hover (props off).")
             return
-        print("[!] --accept-default-hover given: continuing on an UNCALIBRATED scale.")
+        log.event("[!] --accept-default-hover given: continuing on an UNCALIBRATED scale.")
 
-    print(f"\n[i] ACRO_RP_RATE={acro_rp_rate:.0f} deg/s  ACRO_Y_RATE={acro_y_rate:.0f}  "
-          f"expo rp={acro_rp_expo:.2f} y={acro_y_expo:.2f} (compensated in software)")
-    print(f"[i] RCMAP r/p/t/y={cmap['ROLL']}/{cmap['PITCH']}/{cmap['THROTTLE']}/{cmap['YAW']}"
-          f"  thr min/dz/trim/max={ch_thr.min}/{ch_thr.dz}/{ch_thr.trim}/{ch_thr.max}")
-    print(f"[i] Thrust map: T_n = {thr_hover:.4f} * a_total / {G:.3f}   "
-          f"(1 g -> T_n={thr_hover:.3f}, no vehicle mass involved)")
+    log.event(f"ACRO_RP_RATE={acro_rp_rate:.0f} deg/s  ACRO_Y_RATE={acro_y_rate:.0f}  "
+              f"expo rp={acro_rp_expo:.2f} y={acro_y_expo:.2f} (compensated in software)")
+    log.event(f"RCMAP r/p/t/y={cmap['ROLL']}/{cmap['PITCH']}/{cmap['THROTTLE']}/{cmap['YAW']}"
+              f"  thr min/dz/trim/max={ch_thr.min}/{ch_thr.dz}/{ch_thr.trim}/{ch_thr.max}")
+    log.event(f"Thrust map: T_n = {thr_hover:.4f} * a_total / {G:.3f}   "
+              f"(1 g -> T_n={thr_hover:.3f}, no vehicle mass involved)")
 
     def build_pwm(roll_rate, pitch_rate, yaw_rate, thrust):
         """Body rates [rad/s] + normalised thrust [0..1] -> the PWM that asks for them."""
@@ -269,11 +287,19 @@ def main():
 
     st = State(); mon = RateMonitor()
     print("[i] Waiting for ATTITUDE + LOCAL_POSITION_NED ...")
+    wait_t0 = time.time()
     while not (st.have_att and st.have_pos):
-        drain(m, st, mon); time.sleep(0.005)
+        drain(m, st, mon, log)
+        if time.time() - wait_t0 > 15.0:
+            log.event(f"[!] No state after 15s (have_att={st.have_att} "
+                      f"have_pos={st.have_pos}). Likely no GPS fix - aborting "
+                      "rather than hanging forever.")
+            return
+        time.sleep(0.005)
     yaw_sp = st.yaw
     x_sp, y_sp = st.x, st.y
-    print(f"[i] State ok. alt={st.altitude:+.2f} yaw={math.degrees(st.yaw):+.1f} deg")
+    log.event(f"State ok. alt={st.altitude:+.2f} yaw={math.degrees(st.yaw):+.1f} deg "
+              f"start_pos=({st.x:.2f},{st.y:.2f})")
 
     # ---- controllers: OUTPUTS ARE ACCELERATIONS [m/s2], not thrust ----
     # These gains are physical and stay meaningful whatever MOT_THST_HOVER
@@ -290,30 +316,37 @@ def main():
     xin = yin = 0.0
 
     # ---- ACRO + arm (throttle at min so the arming check passes) ----
-    if not set_mode_confirm(m, st, mon, "ACRO"):
+    if not set_mode_confirm(m, st, mon, "ACRO", log=log):
         return
     idle = {cmap["ROLL"]: ch_roll.trim, cmap["PITCH"]: ch_pitch.trim,
             cmap["YAW"]: ch_yaw.trim, cmap["THROTTLE"]: ch_thr.min}
     for _ in range(30):
         send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, idle, mon)
-        drain(m, st, mon); time.sleep(0.01)
+        drain(m, st, mon, log); time.sleep(0.01)
 
-    print("[i] Arming (ACRO, throttle min) ...")
+    log.event(f"Arming (ACRO, throttle min, force={args.force_arm}) ...")
     m.mav.command_long_send(m.target_system, m.target_component,
                             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
                             1, 21196 if args.force_arm else 0, 0, 0, 0, 0, 0)
     t_arm = time.time()
     while time.time() - t_arm < 8.0 and not st.armed:
         send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, idle, mon)
-        drain(m, st, mon); time.sleep(0.01)
+        drain(m, st, mon, log); time.sleep(0.01)
     if not st.armed:
-        print("[!] NOT ARMED - see [AP]. Try --force-arm."); return
-    print("[i] Armed. Taking off with ACCBR (throttle-up) ...")
+        log.event("[!] NOT ARMED - see [AP] above. Try --force-arm."); return
+    log.event("Armed. Taking off with ACCBR (throttle-up) ...")
 
     ground_alt = st.altitude
     T = 1.0 / args.freq
     t0 = time.perf_counter(); t_start = t0
-    next_t = t0; last_report = t0; last_loop = t0; jit = 0.0
+    next_t = t0; last_report = t0; last_loop = t0; jit = 0.0; was_stale = False
+    # Altitude setpoint ramps at --climb-rate (m/s), no branch, no snap to the
+    # target - ported from ctbr_acro_rc.py's fix. The old form here (ramp for
+    # a fixed 2s, then jump straight to --alt) was only invisible at --alt 1;
+    # for anything larger it stepped the setpoint discontinuously while still
+    # on the ground, driving near-max commanded thrust into a large
+    # attitude/position excursion (see CLAUDE.md, 2026-08-21).
+    RAMP_RATE = args.climb_rate
 
     try:
         while True:
@@ -321,11 +354,10 @@ def main():
             dt = now - last_loop; last_loop = now
             if dt <= 0:
                 dt = T
-            drain(m, st, mon)
+            drain(m, st, mon, log)
 
             climb_t = now - t_start
-            alt_sp = (ground_alt + min(args.alt, 0.5 * climb_t) if climb_t < 2.0
-                      else ground_alt + args.alt)
+            alt_sp = ground_alt + min(args.alt, RAMP_RATE * climb_t)
             if climb_t > args.hold:
                 break
 
@@ -379,14 +411,49 @@ def main():
             pwm = build_pwm(roll_rate, pitch_rate, yaw_rate, thrust)
             send_rc(m, ch_roll, ch_pitch, ch_thr, ch_yaw, pwm, mon)
 
-            jit = max(jit, abs(now - (next_t - T)))
+            dxy = math.hypot(x_sp - st.x, y_sp - st.y)
+            # Latency diagnostics - same split as ctbr_acro_rc.py: sched_slip
+            # shows whether THIS SCRIPT's own loop is keeping up with its
+            # 100Hz schedule (Pi-side); att_age/pos_age show how stale the
+            # state being acted on is, independent of loop timing - i.e.
+            # whether the FC/link is delivering fresh state every cycle
+            # (FC/link-side). Added per request, to answer the "is it the FC
+            # executing slowly or the Pi processing slowly" question with
+            # actual data on the next flight instead of a guess.
+            sched_slip = now - (next_t - T)
+            att_age = (now - st.att_time) if st.att_time is not None else float("nan")
+            pos_age = (now - st.pos_time) if st.pos_time is not None else float("nan")
+
+            log.row(st.armed, st.custom_mode, f"{st.altitude:.3f}", f"{alt_sp:.3f}",
+                    f"{st.climb_rate:.3f}", f"{a_up:.3f}", f"{a_total:.3f}", f"{a_cmd:.3f}",
+                    f"{thrust:.3f}", f"{st.x:.3f}", f"{st.y:.3f}", f"{dxy:.3f}",
+                    f"{st.vx:.3f}", f"{st.vy:.3f}", f"{math.degrees(st.roll):.2f}",
+                    f"{math.degrees(st.pitch):.2f}", f"{math.degrees(st.yaw):.2f}",
+                    f"{math.degrees(roll_ref):.2f}", f"{math.degrees(pitch_ref):.2f}",
+                    f"{roll_rate:.3f}", f"{pitch_rate:.3f}", f"{yaw_rate:.3f}",
+                    pwm[cmap["ROLL"]], pwm[cmap["PITCH"]], pwm[cmap["YAW"]], pwm[cmap["THROTTLE"]],
+                    f"{dt*1000:.2f}", f"{sched_slip*1000:.2f}",
+                    f"{att_age*1000:.2f}", f"{pos_age*1000:.2f}")
+
+            STALE_MS = 30.0
+            is_stale = att_age * 1000 > STALE_MS or pos_age * 1000 > STALE_MS
+            if is_stale and not was_stale:
+                log.event(f"[!] state went stale: att_age={att_age*1000:.0f}ms "
+                          f"pos_age={pos_age*1000:.0f}ms (>{STALE_MS:.0f}ms threshold) "
+                          f"at alt={st.altitude:+.2f} dxy={dxy:.2f}")
+            elif was_stale and not is_stale:
+                log.event(f"state fresh again: att_age={att_age*1000:.0f}ms "
+                          f"pos_age={pos_age*1000:.0f}ms")
+            was_stale = is_stale
+
+            jit = max(jit, abs(sched_slip))
             if now - last_report >= 1.0:
-                dxy = math.hypot(x_sp - st.x, y_sp - st.y)
                 print(f"alt={st.altitude:+.2f}(sp{alt_sp:+.2f}) dxy={dxy:4.2f} "
                       f"a_up={a_up:+5.2f} a_tot={a_total:5.2f} a_prj={a_cmd:5.2f} m/s2 "
                       f"T_n={thrust:.3f} pwm={pwm[cmap['THROTTLE']]} "
                       f"r={math.degrees(st.roll):+5.1f} p={math.degrees(st.pitch):+5.1f} "
-                      f"| {mon.report()} | jit<={jit*1e3:4.1f}ms")
+                      f"| {mon.report()} | jit<={jit*1e3:4.1f}ms "
+                      f"att_age={att_age*1e3:4.1f}ms pos_age={pos_age*1e3:4.1f}ms")
                 last_report = now; jit = 0.0
 
             next_t += T
@@ -397,27 +464,30 @@ def main():
                 next_t = time.perf_counter()
 
     except KeyboardInterrupt:
-        print("\n[i] Interrupted.")
+        log.event("Interrupted (Ctrl-C).")
+    except Exception as e:
+        log.event(f"[!] Unhandled exception: {type(e).__name__}: {e}")
+        raise
     finally:
-        print("[i] Landing (LAND mode) ...")
+        log.event("Landing (LAND mode) ...")
         # Confirm LAND *before* releasing the override: releasing first hands
         # throttle back to the RC receiver while still in ACRO, and if the mode
         # change is then dropped that is zero throttle in mid-air.
         landed_mode = False
         for attempt in range(3):
-            if set_mode_confirm(m, st, mon, "LAND", timeout=3.0):
+            if set_mode_confirm(m, st, mon, "LAND", timeout=3.0, log=log):
                 landed_mode = True
                 break
-            print(f"[!] LAND not confirmed (attempt {attempt + 1}/3), retrying ...")
+            log.event(f"[!] LAND not confirmed (attempt {attempt + 1}/3), retrying ...")
         if landed_mode:
             m.mav.rc_channels_override_send(m.target_system, 1, *([0] * 8))
         else:
-            print("[!] LAND NOT CONFIRMED - not releasing the override, so throttle "
-                  "is not actively handed back mid-air. TAKE MANUAL CONTROL NOW.")
+            log.event("[!] LAND NOT CONFIRMED - not releasing the override, so throttle "
+                      "is not actively handed back mid-air. TAKE MANUAL CONTROL NOW.")
         t_l = time.time()
         while time.time() - t_l < 20.0 and st.armed:
-            drain(m, st, mon); time.sleep(0.1)
-        print("[i] Done." if not st.armed else "[i] Done (still armed).")
+            drain(m, st, mon, log); time.sleep(0.1)
+        log.event("Done." if not st.armed else "Done (still armed).")
 
 
 if __name__ == "__main__":
